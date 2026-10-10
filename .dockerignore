@@ -1,0 +1,12 @@
+.git
+.dev
+.direnv
+node_modules
+dist
+dist-server
+result
+*.db
+*.db-*
+.env
+Dockerfile
+.dockerignore
