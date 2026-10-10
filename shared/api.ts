@@ -376,3 +376,73 @@ export interface LibraryResponse {
   artists: FollowedArtist[];
   likedCount: number;
 }
+
+// Play history and stats.
+
+export type PlayContextType = "album" | "playlist" | "artist" | "search" | "queue";
+
+/** Where a track was played from. */
+export interface PlayContext {
+  type: PlayContextType;
+  /** Album, playlist or artist ID (absent for search and queue). */
+  id?: string;
+  name?: string;
+  /** Album cover or artist image, for "recently played" cards. */
+  image?: string;
+}
+
+/**
+ * The client records a play once the track has played for this long, or
+ * when it finishes, whichever comes first; once per play-through.
+ */
+export const PLAY_THRESHOLD_MS = 30_000;
+
+/** `POST history/plays`. */
+export interface RecordPlayRequest {
+  track: TrackSnapshot;
+  msPlayed: number;
+  /** Default: now. Lets a client send plays it could not send earlier. */
+  playedAt?: string;
+  /** Default `{ type: "queue" }`. */
+  context?: PlayContext;
+}
+
+/** A recently played album, playlist or artist; one per context, newest first. */
+export interface RecentContext {
+  type: "album" | "playlist" | "artist";
+  id: string;
+  name: string;
+  image?: string;
+  /** Playlists: their mosaic covers. */
+  covers?: string[];
+  lastPlayedAt: string;
+}
+
+/** `GET history/recent`: for the home screen's quick-access grid and "recently played". */
+export interface RecentResponse {
+  contexts: RecentContext[];
+}
+
+export type StatsRange = "4w" | "6m" | "all";
+
+export interface TrackStat {
+  track: TrackSnapshot;
+  plays: number;
+}
+
+/** Artists count each play of a track by its main (first) artist. */
+export interface ArtistStat {
+  artist: ArtistSummary;
+  plays: number;
+}
+
+/** `GET stats?range=4w|6m|all` (default 4w). */
+export interface StatsResponse {
+  range: StatsRange;
+  /** Start of the range; null for all time. */
+  since: string | null;
+  totalPlays: number;
+  totalMinutes: number;
+  topTracks: TrackStat[];
+  topArtists: ArtistStat[];
+}
