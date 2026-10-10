@@ -197,17 +197,49 @@ function MenuView() {
 
 // Dialogs
 
-/** A modal panel with a title; closes on Escape and on a click outside. W5b's edit dialogs build on it. */
+const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * A modal panel with a title. Escape and a click outside close it; Tab stays
+ * inside it, and focus goes back where it was when it closes.
+ */
 export function Modal(props: { title: string; onClose(): void; children: ReactNode; footer?: ReactNode }) {
   const { onClose } = props;
+  const panel = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    const before = document.activeElement as HTMLElement | null;
+    const element = panel.current;
+    if (element && !element.contains(document.activeElement)) element.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        close.current();
+        return;
+      }
+      if (event.key !== "Tab" || !element) return;
+      const items = [...element.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const inside = element.contains(document.activeElement);
+      if (event.shiftKey && (document.activeElement === first || !inside)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !inside)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (before && document.contains(before)) before.focus();
+    };
+  }, []);
   return (
     <div className="backdrop" onPointerDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={props.title}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={props.title} ref={panel}>
         <header className="modal-head">
           <h2>{props.title}</h2>
           <button className="icon-button" onClick={onClose} aria-label="Close">

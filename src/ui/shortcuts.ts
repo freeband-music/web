@@ -14,6 +14,9 @@ function isTyping(target: EventTarget | null): boolean {
   return target instanceof HTMLInputElement && !["range", "checkbox", "radio", "button"].includes(target.type);
 }
 
+/** Dialogs and menus get the keyboard to themselves. */
+const overlayOpen = () => document.querySelector(".modal, .menu") !== null;
+
 function focusSearch() {
   const find = () => document.querySelector<HTMLInputElement>(`[${SEARCH_INPUT_ATTR}]`);
   const input = find();
@@ -28,12 +31,12 @@ function focusSearch() {
 
 /**
  * Space play/pause, ←/→ seek 10 s, Shift+←/→ previous/next, ↑/↓ volume,
- * `/` focus search. Ignored while typing in a field.
+ * `/` focus search. Ignored while typing in a field and while a dialog or menu is open.
  */
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.ctrlKey || event.metaKey || event.altKey || isTyping(event.target)) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || isTyping(event.target) || overlayOpen()) return;
       const playback = usePlayback.getState();
       const handlers: Record<string, () => void> = {
         " ": playback.toggle,
