@@ -1,0 +1,9 @@
+# Only install package versions that have been public for at least a day.
+minimumReleaseAge: 1440
+allowBuilds:
+  esbuild: true
+  better-sqlite3: false
+onlyBuiltDependencies:
+  - esbuild
+ignoredBuiltDependencies:
+  - better-sqlite3

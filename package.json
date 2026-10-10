@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.3",
-    "@fastify/static": "^10.1.6",
+    "@fastify/static": "^10.1.5",
     "better-sqlite3": "^13.0.3",
     "fastify": "^5.12.5",
     "kysely": "^0.29.6",
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
@@ -36,13 +36,5 @@
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vitest": "^5.0.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ],
-    "ignoredBuiltDependencies": [
-      "better-sqlite3"
-    ]
   }
 }
