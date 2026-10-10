@@ -1,7 +1,7 @@
 default:
     @just --list
 
-# Run the server (port 7000) and the web app (http://localhost:5173, also reachable from the LAN)
+# Run the server (port 7010) and the web app (http://localhost:5173, also reachable from the LAN)
 dev:
     #!/usr/bin/env bash
     trap 'kill 0' EXIT
@@ -23,7 +23,7 @@ build:
     pnpm build
     pnpm run build:server
 
-# Run the production build on port 7000 (needs FREEBAND_SECRET_KEY)
+# Run the production build on port 7010 (needs FREEBAND_SECRET_KEY)
 start: build
     NODE_ENV=production pnpm start
 

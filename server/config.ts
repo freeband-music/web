@@ -115,7 +115,7 @@ export function loadConfig(env: Env = process.env, warn: (msg: string) => void =
   if (!SIGNUP_MODES.includes(signup)) {
     throw new Error(`FREEBAND_SIGNUP must be one of ${SIGNUP_MODES.join(", ")}`);
   }
-  const port = Number(env.FREEBAND_PORT ?? 7000);
+  const port = Number(env.FREEBAND_PORT ?? 7010);
   if (!Number.isInteger(port) || port <= 0) throw new Error("FREEBAND_PORT must be a port number");
   const secure = env.FREEBAND_COOKIE_SECURE;
   return {

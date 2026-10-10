@@ -20,7 +20,7 @@ RUN pnpm build && pnpm run build:server
 FROM node:22-slim AS runtime
 ENV NODE_ENV=production \
     DATABASE_URL=sqlite:/data/freeband.db \
-    FREEBAND_PORT=7000 \
+    FREEBAND_PORT=7010 \
     FREEBAND_STATIC_DIR=/app/dist
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
@@ -30,5 +30,5 @@ COPY package.json ./
 RUN mkdir -p /data && chown node:node /data
 USER node
 VOLUME /data
-EXPOSE 7000
+EXPOSE 7010
 CMD ["node", "dist-server/main.js"]

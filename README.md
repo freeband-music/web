@@ -33,7 +33,7 @@ With Nix:
 ```
 nix develop
 pnpm install     # first time only
-just dev         # server on :7000, web app on http://localhost:5173 (also on the LAN)
+just dev         # server on :7010, web app on http://localhost:5173 (also on the LAN)
 just check       # tests, type checks and production builds
 ```
 
@@ -41,7 +41,7 @@ Without Nix you need Node 22 and pnpm:
 
 ```
 pnpm install
-pnpm dev:server  # API server on port 7000, restarts on changes
+pnpm dev:server  # API server on port 7010, restarts on changes
 pnpm dev         # web app on port 5173; proxies /api to the server
 pnpm test
 ```
@@ -57,7 +57,7 @@ pnpm build && pnpm build:server
 NODE_ENV=production FREEBAND_SECRET_KEY=... pnpm start
 ```
 
-(`just build` and `just start` do the same.) The server listens on port 7000,
+(`just build` and `just start` do the same.) The server listens on port 7010,
 serves the API under `/api` and the built web app from `dist/`, and applies
 pending database migrations at start-up.
 
@@ -67,7 +67,7 @@ Generate a key with `openssl rand -base64 32`.
 
 ```
 docker build -t freeband-web .
-docker run -d -p 7000:7000 -v freeband:/data \
+docker run -d -p 7010:7010 -v freeband:/data \
   -e FREEBAND_SECRET_KEY=... freeband-web
 ```
 
@@ -80,7 +80,7 @@ The image runs as a non-root user and keeps its SQLite database in the
 |---|---|---|
 | `NODE_ENV` | | `production` requires `FREEBAND_SECRET_KEY` |
 | `FREEBAND_SECRET_KEY` | dev: `.dev/secret.key` | 32 bytes, base64 or hex; encrypts stored add-on URLs |
-| `FREEBAND_PORT` | `7000` | Port to listen on |
+| `FREEBAND_PORT` | `7010` | Port to listen on |
 | `FREEBAND_HOST` | `0.0.0.0` | Address to listen on |
 | `DATABASE_URL` | `sqlite:.dev/freeband.db` | Database (Docker: `sqlite:/data/freeband.db`) |
 | `FREEBAND_SIGNUP` | `open` | `open`, `invite` or `closed`; the admin's setting overrides it |
