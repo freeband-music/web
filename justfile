@@ -1,18 +1,26 @@
 default:
     @just --list
 
-# Run the web app (http://localhost:5173, also reachable from the LAN)
+# Run the server (port 7000) and the web app (http://localhost:5173, also reachable from the LAN)
 dev:
+    #!/usr/bin/env bash
+    trap 'kill 0' EXIT
+    pnpm run dev:server &
     pnpm exec vite --host --port 5173 --strictPort
 
 # Unit tests
 test:
     pnpm test
 
-# Tests, type check and production build
+# Tests, type checks and production builds of the client and the server
 check: test
-    pnpm exec tsc --noEmit
+    pnpm run typecheck
     pnpm build
+    pnpm run build:server
+
+# Database migrations: latest (default), up or down (one step)
+migrate direction="latest":
+    pnpm run migrate {{direction}}
 
 # Regenerate protocol types from the protocol repository's openapi.yaml
 gen:
