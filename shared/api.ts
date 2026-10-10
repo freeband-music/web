@@ -90,7 +90,12 @@ export interface AdminSetPasswordRequest {
 
 export interface ServerSettings {
   signup: SignupMode;
+  /** Refuse add-ons whose host resolves to a loopback, private or link-local address. */
+  blockPrivateAddons: boolean;
 }
+
+/** `PUT admin/settings`: only the given fields change; the answer holds them all. */
+export type ServerSettingsUpdate = Partial<ServerSettings>;
 
 export interface InviteInfo {
   code: string;

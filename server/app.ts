@@ -5,6 +5,7 @@ import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance } from "fastify";
 import { CSRF_HEADER, CSRF_VALUE } from "../shared/api";
 import { defaultFetch } from "./addons/http";
+import { AddonNetworkGuard } from "./addons/network";
 import { PrefetchManager } from "./addons/prefetch";
 import { AddonService } from "./addons/service";
 import { RateLimiter } from "./auth/rate-limit";
@@ -13,6 +14,7 @@ import type { Config } from "./config";
 import type { AppContext, Deps } from "./context";
 import { errorBody, installErrorHandler } from "./http";
 import { routeModules } from "./routes/index";
+import { getBlockPrivateAddons } from "./settings";
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const PURGE_INTERVAL_MS = 10 * 60 * 1000;
@@ -25,7 +27,9 @@ export async function buildApp(config: Config, deps: Deps, options: BuildOptions
   const app = Fastify({ logger: options.logger ?? false, trustProxy: config.trustProxy });
   const now = deps.now ?? (() => new Date());
   const cache = new Cache(new DbCacheStore(deps.db), now);
-  const addons = new AddonService(cache, config.ttl, deps.fetch ?? defaultFetch);
+  const addonGuard = new AddonNetworkGuard(deps.lookup);
+  addonGuard.blockPrivate = await getBlockPrivateAddons(deps.db);
+  const addons = new AddonService(cache, config.ttl, addonGuard.wrap(deps.fetch ?? defaultFetch));
   const ctx: AppContext = {
     config,
     db: deps.db,
@@ -33,6 +37,7 @@ export async function buildApp(config: Config, deps: Deps, options: BuildOptions
     loginLimiter: new RateLimiter(5, 15 * 60 * 1000),
     cache,
     addons,
+    addonGuard,
     prefetch: new PrefetchManager(addons, config.prefetch),
   };
   app.decorate("ctx", ctx);

@@ -47,6 +47,36 @@ function SignupSettings() {
   );
 }
 
+function NetworkSettings() {
+  const settings = useAsync(() => admin.settings(), "admin-settings");
+  const [block, setBlock] = useState<boolean>();
+  if (settings.loading || "error" in settings) return null;
+  const shown = block ?? settings.data.blockPrivateAddons;
+  const toggle = async (value: boolean) => {
+    setBlock(value);
+    try {
+      await admin.updateSettings({ blockPrivateAddons: value });
+      toast("Add-on setting saved");
+    } catch (error) {
+      setBlock(!value);
+      toast(errorMessage(error));
+    }
+  };
+  return (
+    <section className="settings-card">
+      <h2>Add-on network access</h2>
+      <label className="check-row">
+        <input type="checkbox" checked={shown} onChange={(event) => void toggle(event.target.checked)} />
+        Block add-ons on private networks
+      </label>
+      <p className="muted small">
+        When on, add-ons whose address is on this machine or a local network (loopback, private, link-local) cannot be
+        installed or used. Leave it off if your add-ons run on your own network.
+      </p>
+    </section>
+  );
+}
+
 function Invites({ names }: { names: Map<string, string> }) {
   const [version, setVersion] = useState(0);
   const invites = useAsync(() => admin.invites(), `invites-${version}`);
@@ -236,6 +266,7 @@ export function AdminScreen() {
     <div className="screen narrow">
       <h1>Admin</h1>
       <SignupSettings />
+      <NetworkSettings />
       <Invites names={names} />
       {"error" in users && <p className="status error">{users.error}</p>}
       {!users.loading && <Users users={list} onChange={() => setVersion((v) => v + 1)} />}

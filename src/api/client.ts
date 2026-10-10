@@ -39,6 +39,7 @@ import {
   type SavedAlbumsResponse,
   type SearchType,
   type ServerSettings,
+  type ServerSettingsUpdate,
   type SessionsResponse,
   type SettingsResponse,
   type SignupRequest,
@@ -147,7 +148,7 @@ export const admin = {
   setPassword: (userId: string, password: string) =>
     send<void>("POST", `/admin/users/${id(userId)}/password`, { password }),
   settings: () => get<ServerSettings>("/admin/settings"),
-  updateSettings: (settings: ServerSettings) => send<ServerSettings>("PUT", "/admin/settings", settings),
+  updateSettings: (settings: ServerSettingsUpdate) => send<ServerSettings>("PUT", "/admin/settings", settings),
   clearCache: () => send<void>("POST", "/admin/cache/clear"),
   invites: () => get<InvitesResponse>("/admin/invites"),
   createInvite: () => send<InviteResponse>("POST", "/admin/invites"),

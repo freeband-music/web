@@ -106,5 +106,18 @@ test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch th
 
   const list = (await call("GET", "/api/addons")).json();
   expect(JSON.stringify(list)).not.toContain("url_encrypted");
+
+  // With private addresses blocked, the same add-on can no longer be installed or asked.
+  const settings = await app.inject({
+    method: "PUT",
+    url: "/api/admin/settings",
+    payload: { blockPrivateAddons: true },
+    headers: { cookie },
+  });
+  expect(settings.json()).toEqual({ signup: "open", blockPrivateAddons: true });
+  const blocked = await call("POST", "/api/addons", { url: `${addonUrl}/configured/abcdefghijklmnopqrstuvwxyz0123456789` });
+  expect(blocked.statusCode).toBe(400);
+  expect(blocked.json().error.code).toBe("addon_blocked");
+  expect((await call("GET", "/api/search?q=blocked")).json().errors[0].message).toMatch(/private network/);
   await app.close();
 });

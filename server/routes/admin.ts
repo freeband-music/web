@@ -8,12 +8,15 @@ import { passwordSchema } from "../auth/validation";
 import { randomToken } from "../crypto";
 import type { Invite } from "../db/schema";
 import { badRequest, notFound, parse } from "../http";
-import { getSignupMode, setSetting } from "../settings";
+import { getSignupMode, setBlockPrivateAddons, setSetting } from "../settings";
 
 const idParams = z.object({ id: z.string().min(1) });
 const codeParams = z.object({ code: z.string().min(1) });
 const passwordBody = z.object({ password: passwordSchema });
-const settingsBody = z.object({ signup: z.enum(SIGNUP_MODES) });
+const settingsBody = z.object({
+  signup: z.enum(SIGNUP_MODES).optional(),
+  blockPrivateAddons: z.boolean().optional(),
+});
 
 function toInviteInfo(i: Invite): InviteInfo {
   return { code: i.code, createdBy: i.created_by, createdAt: i.created_at, usedBy: i.used_by, usedAt: i.used_at };
@@ -51,12 +54,21 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(204).send();
   });
 
-  app.get("/admin/settings", async (): Promise<ServerSettings> => ({ signup: await getSignupMode(app.ctx) }));
+  const settings = async (): Promise<ServerSettings> => ({
+    signup: await getSignupMode(app.ctx),
+    blockPrivateAddons: app.ctx.addonGuard.blockPrivate,
+  });
+
+  app.get("/admin/settings", settings);
 
   app.put("/admin/settings", async (req): Promise<ServerSettings> => {
     const body = parse(settingsBody, req.body);
-    await setSetting(db, "signup", body.signup);
-    return { signup: body.signup };
+    if (body.signup !== undefined) await setSetting(db, "signup", body.signup);
+    if (body.blockPrivateAddons !== undefined) {
+      await setBlockPrivateAddons(db, body.blockPrivateAddons);
+      app.ctx.addonGuard.blockPrivate = body.blockPrivateAddons;
+    }
+    return settings();
   });
 
   app.post("/admin/cache/clear", async (_req, reply) => {

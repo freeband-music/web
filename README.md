@@ -131,9 +131,14 @@ types in `server/db/schema.ts`.
 - Serve Freeband over HTTPS. Behind a reverse proxy, set
   `FREEBAND_TRUST_PROXY=true` so client addresses (used for sign-in rate
   limiting) and HTTPS detection (used for secure cookies) are correct.
-- The server fetches add-on URLs that users enter. On a shared instance,
-  restrict sign-up and keep the server away from internal services it should
-  not reach.
+- The server fetches add-on URLs that users enter. Add-ons on the local
+  network are allowed by default, since self-hosted add-ons often run there.
+  On a shared instance, restrict sign-up and turn on "Block add-ons on
+  private networks" on the Admin screen: add-ons whose host resolves to a
+  loopback, private, link-local, carrier-grade NAT or unspecified address are
+  then refused at install time and before every request, redirects included.
+  Answers cached before the switch was turned on are still served until they
+  expire (clear the cache to drop them).
 
 ## Protocol and add-ons
 

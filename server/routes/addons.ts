@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { AddonFailure, AddonResponse, AddonsResponse } from "../../shared/api";
 import { AddonError } from "../addons/http";
+import { BlockedAddonError } from "../addons/network";
 import { listAddonRows, refreshManifest, toAddonInfo, writeOrder } from "../addons/store";
 import { normalizeAddonUrl, splitAddonUrl } from "../addons/urls";
 import { currentUser, requireUser } from "../auth/guard";
@@ -48,6 +49,7 @@ export default async function addonRoutes(app: FastifyInstance): Promise<void> {
     try {
       manifest = await service.fetchManifest(url);
     } catch (err) {
+      if (err instanceof BlockedAddonError) throw badRequest(err.message, "addon_blocked");
       if (err instanceof AddonError) throw badRequest(err.message, "addon_invalid");
       throw err;
     }

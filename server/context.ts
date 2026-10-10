@@ -1,4 +1,5 @@
 import type { FetchFn } from "./addons/http";
+import type { AddonNetworkGuard, LookupFn } from "./addons/network";
 import type { PrefetchManager } from "./addons/prefetch";
 import type { AddonService } from "./addons/service";
 import type { RateLimiter } from "./auth/rate-limit";
@@ -12,6 +13,8 @@ export interface Deps {
   now?: () => Date;
   /** HTTP client for add-on requests; defaults to the global `fetch`. */
   fetch?: FetchFn;
+  /** Host name resolver for the private-network check; defaults to DNS. */
+  lookup?: LookupFn;
 }
 
 /** Available to every route as `app.ctx` (or `req.server.ctx`). */
@@ -23,6 +26,8 @@ export interface AppContext {
   loginLimiter: RateLimiter;
   cache: Cache;
   addons: AddonService;
+  /** Refuses add-on requests to private network addresses when the admin turns it on. */
+  addonGuard: AddonNetworkGuard;
   prefetch: PrefetchManager;
 }
 

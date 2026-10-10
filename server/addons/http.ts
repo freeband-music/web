@@ -35,7 +35,8 @@ export async function getJson(fetchFn: FetchFn, url: string, timeoutMs: number):
     let response: Response;
     try {
       response = await fetchFn(url, { signal: controller.signal, headers: { Accept: "application/json" } });
-    } catch {
+    } catch (err) {
+      if (err instanceof AddonError) throw err;
       throw controller.signal.aborted ? timeout() : new AddonError("Could not reach the add-on.");
     }
     let body: unknown;
