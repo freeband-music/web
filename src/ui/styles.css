@@ -2045,6 +2045,109 @@ textarea:focus {
   margin: 0;
 }
 
+/* Account and admin */
+.screen.narrow {
+  max-width: 760px;
+}
+
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 20px 24px;
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.settings-card h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.settings-card > p {
+  margin: 0;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.admin-list-text {
+  display: flex;
+  flex: 1 1 200px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.admin-list-text > .muted {
+  flex-basis: 100%;
+}
+
+.code {
+  font: 600 14px ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.danger-text {
+  color: var(--danger);
+}
+
+/* Stats and profiles */
+.stat-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.stat-tile {
+  display: flex;
+  flex: 1 1 160px;
+  flex-direction: column;
+  max-width: 260px;
+  padding: 16px 20px;
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.profile-initial {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #3b5bdb, #4ade80);
+  color: #fff;
+  font-size: 96px;
+  font-weight: 800;
+}
+
 /* Phones: no sidebar and no player bar; the dock sits at the bottom. */
 @media (max-width: 768px) {
   .app {
@@ -2229,6 +2332,18 @@ textarea:focus {
 
   .install {
     flex-direction: column;
+  }
+
+  .settings-card {
+    padding: 16px;
+  }
+
+  .stat-tile {
+    max-width: none;
+  }
+
+  .profile-initial {
+    font-size: 72px;
   }
 
   .library-tools {

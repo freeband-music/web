@@ -4,6 +4,7 @@ import { currentItem } from "../queue/queue";
 import { usePlayback } from "../store/playback";
 import { AccountScreen } from "./AccountScreen";
 import { AddonsScreen } from "./AddonsScreen";
+import { AdminScreen } from "./AdminScreen";
 import { AlbumScreen } from "./AlbumScreen";
 import { ArtistScreen } from "./ArtistScreen";
 import { AuthScreen } from "./AuthScreen";
@@ -17,21 +18,13 @@ import { NowPlaying, openNowPlaying } from "./NowPlaying";
 import { PlayerBar } from "./PlayerBar";
 import { createPlaylistFlow } from "./playlistActions";
 import { PlaylistScreen } from "./PlaylistScreen";
+import { ProfileScreen } from "./ProfileScreen";
 import { QueueScreen } from "./QueueScreen";
 import { links, useRoute, type Route } from "./router";
 import { SearchInput, SearchScreen } from "./SearchScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { useKeyboardShortcuts } from "./shortcuts";
-
-/** A screen another step fills in. */
-function Pending({ title }: { title: string }) {
-  return (
-    <div className="screen">
-      <h1>{title}</h1>
-      <p className="muted">Coming soon.</p>
-    </div>
-  );
-}
+import { StatsScreen } from "./StatsScreen";
 
 function Screen({ route }: { route: Route }) {
   switch (route.name) {
@@ -58,11 +51,11 @@ function Screen({ route }: { route: Route }) {
     case "account":
       return <AccountScreen />;
     case "user":
-      return <Pending title={route.username} />;
+      return <ProfileScreen username={route.username} />;
     case "admin":
-      return <Pending title="Admin" />;
+      return <AdminScreen />;
     case "stats":
-      return <Pending title="Your stats" />;
+      return <StatsScreen />;
   }
 }
 
