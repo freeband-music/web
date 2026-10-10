@@ -191,7 +191,10 @@ export interface components {
             url: string;
         };
         StreamResponse: {
-            /** @enum {string} */
+            /**
+             * @description `ok`: at least one stream is ready to play. `queued`: nothing is playable yet, but the add-on has started preparing the track; ask again later (never sent when the request had `queue=false`). `not_found`: nothing playable for this request.
+             * @enum {string}
+             */
             status: "ok" | "queued" | "not_found";
             message?: string;
             /** @description Ordered best first */
@@ -365,6 +368,8 @@ export interface operations {
                 year?: number;
                 /** @description International Standard Recording Code, when the metadata add-on knows it. */
                 isrc?: string;
+                /** @description Whether the add-on may start preparing the track when nothing is playable yet. When `false`, the add-on must not start any work that changes state elsewhere or outlives the request (no downloads, nothing put in a queue): it answers `ok` with the streams that are playable right now, or `not_found`, and never `queued`. A `not_found` answer to such a request says only that nothing is playable immediately; the same request with `queue` left at `true` may still find or prepare a stream. Clients use `false` to look ahead, for example to check a whole play queue without side effects. Added in 0.3.0; older add-ons ignore it. */
+                queue?: boolean;
             };
             header?: never;
             path: {
