@@ -18,7 +18,37 @@ export interface Config {
   /** Directory of the built client; served with an SPA fallback when it exists. */
   staticDir: string;
   production: boolean;
+  /** Cache lifetimes in seconds. */
+  ttl: CacheTtls;
+  prefetch: PrefetchConfig;
 }
+
+export interface CacheTtls {
+  meta: number;
+  search: number;
+  manifest: number;
+  stream: number;
+  notFound: number;
+}
+
+export interface PrefetchConfig {
+  /** Stream lookups running at once per user. */
+  concurrency: number;
+  /** Most tracks one prefetch request covers. */
+  limit: number;
+  /** Only this many tracks after the current one may make a stream add-on queue a download. */
+  queueAhead: number;
+}
+
+export const DEFAULT_TTLS: CacheTtls = {
+  meta: 7 * 86400,
+  search: 86400,
+  manifest: 3600,
+  stream: 6 * 3600,
+  notFound: 3600,
+};
+
+export const DEFAULT_PREFETCH: PrefetchConfig = { concurrency: 2, limit: 50, queueAhead: 3 };
 
 type Env = Record<string, string | undefined>;
 
@@ -39,6 +69,28 @@ export function parseSecretKey(value: string): Buffer {
 function boolEnv(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined || value === "") return fallback;
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+}
+
+const UNITS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+
+/** Parses a duration such as `90`, `90s`, `15m`, `6h` or `7d` into seconds. */
+export function parseDuration(value: string, name: string): number {
+  const match = /^(\d+)\s*([smhd]?)$/i.exec(value.trim());
+  if (!match) throw new Error(`${name} must be a duration such as 3600, 15m, 6h or 7d`);
+  return Number(match[1]) * UNITS[(match[2] || "s").toLowerCase()];
+}
+
+function durationEnv(env: Env, name: string, fallback: number): number {
+  const value = env[name];
+  return value === undefined || value === "" ? fallback : parseDuration(value, name);
+}
+
+function intEnv(env: Env, name: string, fallback: number, min: number): number {
+  const value = env[name];
+  if (value === undefined || value === "") return fallback;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < min) throw new Error(`${name} must be an integer of at least ${min}`);
+  return n;
 }
 
 function loadSecretKey(env: Env, production: boolean, warn: (msg: string) => void): Buffer {
@@ -71,5 +123,17 @@ export function loadConfig(env: Env = process.env, warn: (msg: string) => void =
     trustProxy: boolEnv(env.FREEBAND_TRUST_PROXY, false),
     staticDir: env.FREEBAND_STATIC_DIR ?? "dist",
     production,
+    ttl: {
+      meta: durationEnv(env, "FREEBAND_TTL_META", DEFAULT_TTLS.meta),
+      search: durationEnv(env, "FREEBAND_TTL_SEARCH", DEFAULT_TTLS.search),
+      manifest: durationEnv(env, "FREEBAND_TTL_MANIFEST", DEFAULT_TTLS.manifest),
+      stream: durationEnv(env, "FREEBAND_TTL_STREAM", DEFAULT_TTLS.stream),
+      notFound: durationEnv(env, "FREEBAND_TTL_NOT_FOUND", DEFAULT_TTLS.notFound),
+    },
+    prefetch: {
+      concurrency: intEnv(env, "FREEBAND_PREFETCH_CONCURRENCY", DEFAULT_PREFETCH.concurrency, 1),
+      limit: intEnv(env, "FREEBAND_PREFETCH_LIMIT", DEFAULT_PREFETCH.limit, 0),
+      queueAhead: intEnv(env, "FREEBAND_PREFETCH_QUEUE_AHEAD", DEFAULT_PREFETCH.queueAhead, 0),
+    },
   };
 }

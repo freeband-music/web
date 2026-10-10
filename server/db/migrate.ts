@@ -1,10 +1,12 @@
 import { Migrator, type Migration, type MigrationResultSet } from "kysely/migration";
 import type { Db } from "./index";
 import * as m0001 from "./migrations/0001_init";
+import * as m0002 from "./migrations/0002_addons";
 
 /** Every migration, in order. Add new ones here (static imports keep bundling simple). */
 const migrations: Record<string, Migration> = {
   "0001_init": m0001,
+  "0002_addons": m0002,
 };
 
 export function createMigrator(db: Db): Migrator {

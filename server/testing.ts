@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "./app";
-import type { Config } from "./config";
+import { DEFAULT_PREFETCH, DEFAULT_TTLS, type Config } from "./config";
 import { createDb } from "./db/index";
 import { migrateToLatest } from "./db/migrate";
 
@@ -16,6 +16,8 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     trustProxy: false,
     staticDir: "does-not-exist",
     production: false,
+    ttl: DEFAULT_TTLS,
+    prefetch: DEFAULT_PREFETCH,
     ...overrides,
   };
 }
