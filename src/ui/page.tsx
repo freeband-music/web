@@ -52,3 +52,17 @@ export function formatTotal(ms: number): string {
   if (minutes >= 60) return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
   return `${minutes} min ${Math.floor((ms % 60_000) / 1000)} s`;
 }
+
+/** Shown above a list while rows are selected: a count, actions and Clear. */
+export function SelectionBar(props: { count: number; onClear(): void; children?: ReactNode }) {
+  if (props.count === 0) return null;
+  return (
+    <div className="selection-bar" role="toolbar" aria-label="Selected tracks">
+      <strong>{props.count} selected</strong>
+      <span className="selection-actions">{props.children}</span>
+      <button className="button ghost small" onClick={props.onClear}>
+        Clear
+      </button>
+    </div>
+  );
+}

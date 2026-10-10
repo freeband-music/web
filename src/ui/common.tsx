@@ -193,3 +193,25 @@ export function LikeButton({ track }: { track: TrackSummary }) {
     />
   );
 }
+
+/** Copies text, falling back to a hidden text area where the clipboard API is unavailable (plain HTTP). */
+export async function copyText(text: string, done = "Copied to clipboard"): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    if (!ok) {
+      toast("Could not copy to the clipboard.");
+      return;
+    }
+  }
+  toast(done);
+}

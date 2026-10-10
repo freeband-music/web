@@ -1627,6 +1627,142 @@ input[type="password"]:focus {
 }
 
 
+/* Forms in dialogs and settings screens */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.field > input,
+.field > textarea {
+  font-weight: 400;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised);
+  font: inherit;
+  color: inherit;
+  resize: vertical;
+  outline: none;
+}
+
+textarea:focus {
+  border-color: var(--accent);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  margin: 0;
+  padding: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--raised);
+}
+
+.segmented label {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.segmented label.active {
+  background: var(--text);
+  color: #000;
+  font-weight: 700;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented label:focus-within {
+  outline: 2px solid var(--accent);
+}
+
+/* Selection bar and drag and drop */
+.selection-bar {
+  position: sticky;
+  top: 64px;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.selection-actions {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trow[data-dragging] {
+  opacity: 0.4;
+}
+
+.trow[data-drop="before"] {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.trow[data-drop="after"] {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.trow-handle {
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--muted);
+  touch-action: none;
+  cursor: grab;
+}
+
+.drag-ghost {
+  position: fixed;
+  top: -100px;
+  left: 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.empty-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 24px 0;
+}
+
+.empty-hint h2 {
+  margin: 0;
+}
+
 /* Phones: no sidebar and no player bar; the dock sits at the bottom. */
 @media (max-width: 768px) {
   .app {
@@ -1725,6 +1861,18 @@ input[type="password"]:focus {
     gap: 8px;
     padding: 0 4px;
     min-height: 60px;
+  }
+
+  .tracklist.with-handle .trow {
+    grid-template-columns: minmax(0, 1fr) 40px 40px;
+  }
+
+  .trow-handle {
+    display: grid;
+  }
+
+  .selection-bar {
+    top: 56px;
   }
 
   .trow-lead,

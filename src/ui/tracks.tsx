@@ -17,6 +17,8 @@ import { nextSelection, type SelectMode } from "./selection";
 export interface TrackMenuOptions {
   /** Adds "Remove from this playlist" (the playlist page passes it). */
   onRemove?(): void;
+  /** The label of the remove item (default "Remove from this playlist"). */
+  removeLabel?: string;
 }
 
 function AddToPlaylist({ tracks, context }: { tracks: TrackSnapshot[]; context: MenuContext }) {
@@ -119,7 +121,9 @@ export function trackMenuPage(tracks: TrackSnapshot[], options: TrackMenuOptions
       page: () => ({ title: "Add to playlist", render: (context) => <AddToPlaylist tracks={tracks} context={context} /> }),
     },
   ];
-  if (options.onRemove) items.push({ label: "Remove from this playlist", icon: "remove", onSelect: options.onRemove });
+  if (options.onRemove) {
+    items.push({ label: options.removeLabel ?? "Remove from this playlist", icon: "remove", onSelect: options.onRemove });
+  }
   items.push(
     {
       label: liked ? "Remove from Liked songs" : "Save to Liked songs",
@@ -167,6 +171,15 @@ export function openTrackMenu(anchor: MenuAnchor, tracks: TrackSnapshot[], optio
   if (tracks.length > 0) openMenu(anchor, trackMenuPage(tracks, options));
 }
 
+/** The "Add to playlist" picker on its own (the selection bar). */
+export function openAddToPlaylist(anchor: MenuAnchor, tracks: TrackSnapshot[]): void {
+  if (tracks.length === 0) return;
+  openMenu(anchor, {
+    header: <TrackMenuHeader tracks={tracks} />,
+    render: (context) => <AddToPlaylist tracks={tracks} context={context} />,
+  });
+}
+
 // The list
 
 export interface TrackListRow {
@@ -190,6 +203,11 @@ export interface TrackListProps {
   onSelectionChange?(keys: Set<string>): void;
   /** Adds "Remove from this playlist" to the menu, for the targeted rows. */
   onRemove?(rows: TrackListRow[]): void;
+  removeLabel?: string;
+  /** Shows a drag handle on each row (phones; see `useRowDrag`). */
+  dragHandle?: boolean;
+  /** Extra class names for the list. */
+  className?: string;
   /** Extra attributes per row, for drag and drop. */
   rowProps?(row: TrackListRow, index: number): HTMLAttributes<HTMLLIElement>;
 }
@@ -203,7 +221,7 @@ function useCurrentKey(rows: TrackListRow[], context: PlayContext | undefined): 
 }
 
 function isInteractive(target: EventTarget) {
-  return target instanceof Element && target.closest("a, button, input") !== null;
+  return target instanceof Element && target.closest("a, button, input, [data-drag-handle]") !== null;
 }
 
 export function TrackList(props: TrackListProps) {
@@ -240,7 +258,7 @@ export function TrackList(props: TrackListProps) {
     openTrackMenu(
       anchorAt,
       chosen.map((r) => r.track),
-      { onRemove: props.onRemove && (() => props.onRemove?.(chosen)) },
+      { onRemove: props.onRemove && (() => props.onRemove?.(chosen)), removeLabel: props.removeLabel },
     );
   }
 
@@ -263,7 +281,7 @@ export function TrackList(props: TrackListProps) {
     }
   }
 
-  const classes = ["tracklist", showAlbum && "with-album", showCover && "with-cover"].filter(Boolean).join(" ");
+  const classes = ["tracklist", showAlbum && "with-album", showCover && "with-cover", props.dragHandle && "with-handle", props.className].filter(Boolean).join(" ");
   return (
     <div className={classes}>
       {showHeader && (
@@ -330,6 +348,11 @@ export function TrackList(props: TrackListProps) {
               <span className="trow-more">
                 <IconButton icon="more" label={`More options for ${track.title}`} onClick={(event) => menu(event.currentTarget, index)} />
               </span>
+              {props.dragHandle && (
+                <span className="trow-handle" data-drag-handle aria-label="Drag to reorder" title="Drag to reorder">
+                  <Icon name="drag" />
+                </span>
+              )}
             </li>
           );
         })}
