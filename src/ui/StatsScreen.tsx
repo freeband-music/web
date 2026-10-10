@@ -30,11 +30,11 @@ export function StatsScreen() {
           <div className="stat-tiles">
             <div className="stat-tile">
               <span className="stat-value">{stats.data.totalPlays.toLocaleString()}</span>
-              <span className="muted">plays</span>
+              <span className="muted">{stats.data.totalPlays === 1 ? "play" : "plays"}</span>
             </div>
             <div className="stat-tile">
               <span className="stat-value">{Math.round(stats.data.totalMinutes).toLocaleString()}</span>
-              <span className="muted">minutes listened</span>
+              <span className="muted">{Math.round(stats.data.totalMinutes) === 1 ? "minute" : "minutes"} listened</span>
             </div>
           </div>
           {stats.data.totalPlays === 0 && <p className="muted">Nothing played in {title} yet.</p>}
