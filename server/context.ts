@@ -1,3 +1,4 @@
+import type { RateLimiter } from "./auth/rate-limit";
 import type { Config } from "./config";
 import type { Db } from "./db/index";
 
@@ -12,6 +13,8 @@ export interface AppContext {
   config: Config;
   db: Db;
   now: () => Date;
+  /** Failed sign-ins per IP and username. */
+  loginLimiter: RateLimiter;
 }
 
 declare module "fastify" {

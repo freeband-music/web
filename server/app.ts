@@ -4,6 +4,7 @@ import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance } from "fastify";
 import { CSRF_HEADER, CSRF_VALUE } from "../shared/api";
+import { RateLimiter } from "./auth/rate-limit";
 import type { Config } from "./config";
 import type { AppContext, Deps } from "./context";
 import { errorBody, installErrorHandler } from "./http";
@@ -17,8 +18,14 @@ export interface BuildOptions {
 
 export async function buildApp(config: Config, deps: Deps, options: BuildOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false, trustProxy: config.trustProxy });
-  const ctx: AppContext = { config, db: deps.db, now: deps.now ?? (() => new Date()) };
+  const ctx: AppContext = {
+    config,
+    db: deps.db,
+    now: deps.now ?? (() => new Date()),
+    loginLimiter: new RateLimiter(5, 15 * 60 * 1000),
+  };
   app.decorate("ctx", ctx);
+  app.decorateRequest("auth", null);
   installErrorHandler(app);
   await app.register(cookie);
 
