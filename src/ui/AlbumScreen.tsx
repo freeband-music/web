@@ -1,64 +1,64 @@
 import { content } from "../api/client";
-import { currentItem } from "../queue/queue";
 import { useLibrary } from "../store/library";
-import { usePlayback } from "../store/playback";
-import { albumSnapshot } from "../snapshots";
-import { ArtistLinks, Cover, LikeButton, NowStatus, TrackRow, useAsync, useLikeLookup } from "./common";
+import { albumSnapshot, trackSnapshot } from "../snapshots";
+import { ArtistLinks, count, Cover, IconButton, useAsync } from "./common";
+import { toast } from "./overlays";
+import { ActionBar, formatTotal, PageHeader, ToggleIcon } from "./page";
+import { playTracks } from "./play";
+import { openTrackMenu, TrackList } from "./tracks";
 
 export function AlbumScreen({ id }: { id: string }) {
   const album = useAsync(() => content.album(id), id);
-  const playAlbum = usePlayback((s) => s.playAlbum);
-  const current = usePlayback((s) => currentItem(s.queue));
-  const now = usePlayback((s) => s.now);
   const saved = useLibrary((s) => s.albums.some((a) => a.album.id === id));
-  useLikeLookup(album.loading || "error" in album ? [] : album.data.tracks.map((t) => t.id));
 
   if (album.loading) return <p className="screen muted">Loading…</p>;
   if ("error" in album) return <p className="screen status error">{album.error}</p>;
-  const { title, artists, year, cover, tracks } = album.data;
+  const data = album.data;
+  const { title, artists, year, cover } = data;
+  const tracks = data.tracks.map((t) => trackSnapshot(t, data));
+  const context = { type: "album", id, name: title, image: cover } as const;
   const multiDisc = new Set(tracks.map((t) => t.discNumber ?? 1)).size > 1;
-  const fromHere = current?.context.type === "album" && current.context.id === id;
+  const rows = tracks.map((track, index) => {
+    const number = track.trackNumber ?? String(index + 1);
+    return { key: `${index}-${track.id}`, track, lead: multiDisc && track.discNumber ? `${track.discNumber}-${number}` : number };
+  });
+  const total = tracks.reduce((sum, t) => sum + (t.durationMs ?? 0), 0);
   const toggleSaved = () =>
-    void useLibrary.getState().setAlbumSaved(albumSnapshot(album.data), !saved).catch(() => {});
+    void useLibrary
+      .getState()
+      .setAlbumSaved(albumSnapshot(data), !saved)
+      .then(
+        () => toast(saved ? "Removed from Your Library" : "Saved to Your Library"),
+        () => toast("Could not update Your Library."),
+      );
 
   return (
     <div className="screen">
-      <header className="hero">
-        <Cover src={cover} />
-        <div>
-          <p className="muted">Album</p>
-          <h1>{title}</h1>
-          <p>
-            <ArtistLinks artists={artists} />
-            {year && <span className="muted"> · {year}</span>}
-          </p>
-          <p className="dev-tools">
-            <button className="button primary" onClick={() => playAlbum(album.data, 0)} disabled={tracks.length === 0}>
-              Play album
-            </button>
-            <button className="button" onClick={toggleSaved}>
-              {saved ? "Remove from Library" : "Save to Library"}
-            </button>
-          </p>
-        </div>
-      </header>
-      <ul className="tracks">
-        {tracks.map((track, index) => {
-          const isCurrent = fromHere && current.track.id === track.id;
-          const number = track.trackNumber ?? String(index + 1);
-          return (
-            <TrackRow
-              key={`${index}-${track.id}`}
-              track={track}
-              lead={multiDisc && track.discNumber ? `${track.discNumber}-${number}` : number}
-              current={isCurrent}
-              status={isCurrent && <NowStatus now={now} />}
-              onPlay={() => playAlbum(album.data, index)}
-              actions={<LikeButton track={track} />}
-            />
-          );
-        })}
-      </ul>
+      <PageHeader
+        cover={<Cover src={cover} />}
+        kind="Album"
+        title={title}
+        meta={
+          <>
+            <strong>
+              <ArtistLinks artists={artists} />
+            </strong>
+            {year && <span> · {year}</span>}
+            <span>
+              {" "}
+              · {count(tracks.length, "song")}{total > 0 && `, ${formatTotal(total)}`}
+            </span>
+          </>
+        }
+      />
+      <ActionBar
+        onPlay={tracks.length ? () => playTracks(tracks, context) : undefined}
+        onShuffle={tracks.length ? () => playTracks(tracks, context, { shuffle: true }) : undefined}
+      >
+        <ToggleIcon on={saved} onLabel="Remove from Your Library" offLabel="Save to Your Library" onClick={toggleSaved} />
+        <IconButton icon="more" label="More options" className="large" onClick={(event) => openTrackMenu(event.currentTarget, tracks)} />
+      </ActionBar>
+      <TrackList rows={rows} onPlay={(index) => playTracks(tracks, context, { index })} context={context} showHeader />
     </div>
   );
 }

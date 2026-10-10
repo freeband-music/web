@@ -1,7 +1,7 @@
 import { currentItem, nextIndex } from "../queue/queue";
 import { usePlayback } from "../store/playback";
 import { ArtistLinks, Cover, formatTime, IconButton, LikeButton, NowStatus, useLikeLookup } from "./common";
-import { links } from "./router";
+import { links, navigate } from "./router";
 
 const MATCH_LABEL = { exact: "", edition: "Different edition", loose: "Loose match" } as const;
 
@@ -88,6 +88,7 @@ export function PlayerBar() {
         {matchLabel && <span className="badge warn">{matchLabel}</span>}
         {stream && <span className="badge">{stream.quality.codec.toUpperCase()}</span>}
         {track && <LikeButton track={track} />}
+        <IconButton icon="queue" label="Queue" onClick={() => navigate(links.queue)} />
         <IconButton icon={muted ? "mute" : "volume"} label={muted ? "Unmute" : "Mute"} onClick={toggleMute} />
         <input
           className="volume"

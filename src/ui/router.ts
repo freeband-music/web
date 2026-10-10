@@ -1,36 +1,55 @@
 import { useSyncExternalStore } from "react";
 
-export type Route =
-  | { name: "search" | "queue" | "library" | "addons" | "settings" | "account" }
-  | { name: "artist" | "album" | "playlist"; id: string };
+/** The per-type lists of search results ("See all"). */
+export const SEARCH_TABS = ["songs", "artists", "albums", "playlists"] as const;
+export type SearchTab = (typeof SEARCH_TABS)[number];
 
-const PAGES = ["search", "queue", "library", "addons", "settings", "account"] as const;
+export type Route =
+  | { name: "home" | "library" | "liked" | "queue" | "addons" | "settings" | "account" | "admin" | "stats" }
+  | { name: "search"; tab?: SearchTab }
+  | { name: "artist" | "album" | "playlist"; id: string }
+  | { name: "user"; username: string };
+
+const PAGES = ["library", "liked", "queue", "addons", "settings", "account", "admin", "stats"] as const;
 const ITEMS = ["artist", "album", "playlist"] as const;
 
 /** IDs contain colons and other reserved characters, so they are always encoded. */
 export const links = {
+  home: "/",
   search: "/search",
+  searchTab: (tab: SearchTab) => `/search/${tab}`,
   queue: "/queue",
   library: "/library",
+  liked: "/liked",
   addons: "/addons",
   settings: "/settings",
   account: "/account",
+  admin: "/admin",
+  stats: "/stats",
   artist: (id: string) => `/artist/${encodeURIComponent(id)}`,
   album: (id: string) => `/album/${encodeURIComponent(id)}`,
   playlist: (id: string) => `/playlist/${encodeURIComponent(id)}`,
+  user: (username: string) => `/user/${encodeURIComponent(username)}`,
 };
 
 export function parsePath(path: string): Route {
   const [name, ...rest] = path.replace(/^\/+/, "").split("/");
+  if (name === "") return { name: "home" };
   if ((PAGES as readonly string[]).includes(name)) return { name: name as (typeof PAGES)[number] };
-  if ((ITEMS as readonly string[]).includes(name) && rest.length > 0) {
-    try {
-      return { name: name as (typeof ITEMS)[number], id: decodeURIComponent(rest.join("/")) };
-    } catch {
-      return { name: "search" };
-    }
+  if (name === "search") {
+    const tab = SEARCH_TABS.find((t) => t === rest[0]);
+    return tab ? { name: "search", tab } : { name: "search" };
   }
-  return { name: "search" };
+  if (rest.length === 0) return { name: "home" };
+  let id: string;
+  try {
+    id = decodeURIComponent(rest.join("/"));
+  } catch {
+    return { name: "home" };
+  }
+  if ((ITEMS as readonly string[]).includes(name)) return { name: name as (typeof ITEMS)[number], id };
+  if (name === "user") return { name: "user", username: id };
+  return { name: "home" };
 }
 
 const listeners = new Set<() => void>();
@@ -40,6 +59,8 @@ export function navigate(path: string, replace = false): void {
   if (path === window.location.pathname) return;
   if (replace) window.history.replaceState(null, "", path);
   else window.history.pushState(null, "", path);
+  // The shell's main area is the scrolling element.
+  document.querySelector("[data-scroll-root]")?.scrollTo(0, 0);
   window.scrollTo(0, 0);
   notify();
 }

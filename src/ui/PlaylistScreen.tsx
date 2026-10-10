@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import type { PlaylistResponse } from "../../shared/api";
 import { content, errorMessage, playlists } from "../api/client";
-import { currentItem } from "../queue/queue";
 import { useLibrary } from "../store/library";
-import { usePlayback } from "../store/playback";
-import { Cover, IconButton, LikeButton, NowStatus, TrackRow, useLikeLookup } from "./common";
-import { links, navigate } from "./router";
+import { count, IconButton, Mosaic } from "./common";
+import { openMenu, promptDialog, toast } from "./overlays";
+import { ActionBar, formatTotal, PageHeader, ToggleIcon } from "./page";
+import { playTracks } from "./play";
+import { deletePlaylistFlow } from "./playlistActions";
+import { links } from "./router";
+import { TrackList } from "./tracks";
 
 export function PlaylistScreen({ id }: { id: string }) {
   const [data, setData] = useState<PlaylistResponse>();
   const [error, setError] = useState<string>();
-  const current = usePlayback((s) => currentItem(s.queue));
-  const now = usePlayback((s) => s.now);
   const followed = useLibrary((s) => s.followedPlaylists.some((p) => p.id === id));
-  useLikeLookup(data?.tracks.map((e) => e.track.id) ?? []);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,102 +35,106 @@ export function PlaylistScreen({ id }: { id: string }) {
 
   if (error) return <p className="screen status error">{error}</p>;
   if (!data) return <p className="screen muted">Loading…</p>;
-  const { playlist, tracks } = data;
+  const { playlist } = data;
+  const tracks = data.tracks.map((e) => e.track);
   const context = { type: "playlist", id, name: playlist.name, image: playlist.covers[0] } as const;
-  const play = (index: number) =>
-    usePlayback.getState().playList(
-      tracks.map((e) => e.track),
-      index,
-      context,
-    );
+  const rows = data.tracks.map((e) => ({ key: e.entryId, track: e.track }));
   const library = useLibrary.getState();
-  const act = (action: () => Promise<PlaylistResponse | void>) =>
+  const act = (action: () => Promise<PlaylistResponse | void>, done?: string) =>
     void action().then(
-      (response) => response && setData(response),
-      (cause: unknown) => setError(errorMessage(cause)),
+      (response) => {
+        if (response) setData(response);
+        if (done) toast(done);
+      },
+      (cause: unknown) => toast(errorMessage(cause)),
     );
+  const meta = (
+    <>
+      <strong>
+        <a href={links.user(playlist.owner.username)}>{playlist.owner.displayName}</a>
+      </strong>
+      <span>
+        {" "}
+        · {count(playlist.trackCount, "song")}{playlist.durationMs > 0 && `, ${formatTotal(playlist.durationMs)}`}
+      </span>
+    </>
+  );
 
   return (
     <div className="screen">
-      <header className="hero">
-        <Cover src={playlist.covers[0]} />
-        <div>
-          <p className="muted">{playlist.visibility === "public" ? "Public playlist" : "Private playlist"}</p>
-          <h1>{playlist.name}</h1>
-          {playlist.description && <p>{playlist.description}</p>}
-          <p className="muted">
-            {playlist.owner.displayName} · {playlist.trackCount} tracks
-          </p>
-          <p className="dev-tools">
-            <button className="button primary" onClick={() => play(0)} disabled={tracks.length === 0}>
-              Play
-            </button>
-            {playlist.isOwner ? (
-              <>
-                <button
-                  className="button"
-                  onClick={() =>
-                    act(() =>
-                      library.updatePlaylist(id, {
-                        visibility: playlist.visibility === "public" ? "private" : "public",
-                      }),
-                    )
-                  }
-                >
-                  Make {playlist.visibility === "public" ? "private" : "public"}
-                </button>
-                <button
-                  className="button"
-                  onClick={() => {
-                    if (window.confirm(`Delete “${playlist.name}”?`)) {
-                      act(async () => {
-                        await library.deletePlaylist(id);
-                        navigate(links.library, true);
-                      });
-                    }
-                  }}
-                >
-                  Delete
-                </button>
-              </>
-            ) : (
-              <button className="button" onClick={() => act(() => library.setPlaylistFollowed(playlist, !followed))}>
-                {followed ? "Unfollow" : "Follow"}
-              </button>
-            )}
-          </p>
-        </div>
-      </header>
-      {tracks.length === 0 && <p className="muted">This playlist is empty.</p>}
-      <ul className="tracks">
-        {tracks.map((entry, index) => {
-          const isCurrent =
-            current?.context.type === "playlist" && current.context.id === id && current.track.id === entry.track.id;
-          return (
-            <TrackRow
-              key={entry.entryId}
-              track={entry.track}
-              lead={<Cover src={entry.track.album?.cover} />}
-              showAlbum
-              current={isCurrent}
-              status={isCurrent && <NowStatus now={now} />}
-              onPlay={() => play(index)}
-              actions={
-                <>
-                  <LikeButton track={entry.track} />
-                  {playlist.isOwner && (
-                    <IconButton
-                      icon="remove"
-                      label="Remove from playlist"
-                      onClick={() => act(() => library.removeFromPlaylist(id, [entry.entryId]))}
-                    />
-                  )}
-                </>
-              }
-            />
-          );
-        })}
-      </ul>
+      <PageHeader
+        cover={<Mosaic covers={playlist.covers} />}
+        kind={playlist.visibility === "public" ? "Public playlist" : "Private playlist"}
+        title={playlist.name}
+        meta={
+          <>
+            {playlist.description && <p className="page-description">{playlist.description}</p>}
+            {meta}
+          </>
+        }
+      />
+      <ActionBar
+        onPlay={tracks.length ? () => playTracks(tracks, context) : undefined}
+        onShuffle={tracks.length ? () => playTracks(tracks, context, { shuffle: true }) : undefined}
+      >
+        {!playlist.isOwner && (
+          <ToggleIcon
+            on={followed}
+            onLabel="Remove from Your Library"
+            offLabel="Save to Your Library"
+            onClick={() => act(() => library.setPlaylistFollowed(playlist, !followed), followed ? "Removed from Your Library" : "Saved to Your Library")}
+          />
+        )}
+        {playlist.isOwner && (
+          <IconButton
+            icon="more"
+            label="More options"
+            className="large"
+            onClick={(event) =>
+              openMenu(event.currentTarget, {
+                items: [
+                  {
+                    label: playlist.visibility === "public" ? "Make private" : "Make public",
+                    icon: "user",
+                    onSelect: () =>
+                      act(() =>
+                        library.updatePlaylist(id, { visibility: playlist.visibility === "public" ? "private" : "public" }),
+                      ),
+                  },
+                  {
+                    label: "Rename",
+                    icon: "list",
+                    onSelect: () =>
+                      void promptDialog({ title: "Rename playlist", label: "Name", value: playlist.name }).then(
+                        (name) => name && act(() => library.updatePlaylist(id, { name })),
+                      ),
+                  },
+                  "separator",
+                  { label: "Delete", icon: "remove", danger: true, onSelect: () => void deletePlaylistFlow(playlist) },
+                ],
+              })
+            }
+          />
+        )}
+      </ActionBar>
+      {tracks.length === 0 && <p className="muted">This playlist is empty. Use “Add to playlist” in any track menu.</p>}
+      <TrackList
+        rows={rows}
+        onPlay={(index) => playTracks(tracks, context, { index })}
+        context={context}
+        showCover
+        showAlbum
+        showHeader
+        onRemove={
+          playlist.isOwner
+            ? (removed) =>
+                act(
+                  () => library.removeFromPlaylist(id, removed.map((r) => r.key)),
+                  removed.length === 1 ? "Removed from playlist" : `${removed.length} tracks removed`,
+                )
+            : undefined
+        }
+      />
     </div>
   );
 }
