@@ -18,6 +18,15 @@ check: test
     pnpm build
     pnpm run build:server
 
+# Production builds of the client (dist/) and the server (dist-server/)
+build:
+    pnpm build
+    pnpm run build:server
+
+# Run the production build on port 7000 (needs FREEBAND_SECRET_KEY)
+start: build
+    NODE_ENV=production pnpm start
+
 # Database migrations: latest (default), up or down (one step)
 migrate direction="latest":
     pnpm run migrate {{direction}}
