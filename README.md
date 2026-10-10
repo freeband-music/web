@@ -1,9 +1,9 @@
-# Freeband web client
+# Freeband web
 
 Freeband is an open-source music client in the style of add-on based media
-centres. This repository is the client: a static web app (TypeScript, React,
-Vite). It ships with no add-ons and no content. Everything it shows and plays
-comes from add-ons the user installs.
+centres. This repository is the web app (TypeScript, React, Vite) and its
+server (Node, Fastify, Kysely). It ships with no add-ons and no content.
+Everything it shows and plays comes from add-ons that each user installs.
 
 An add-on is an HTTP server that speaks the
 [Freeband add-on protocol](https://github.com/freeband-music/protocol).
@@ -12,55 +12,125 @@ stream add-ons turn a track's details into playable URLs.
 
 ## Features
 
-- Install add-ons by URL
-- Search across the installed metadata add-ons
+- Accounts; the first user to sign up becomes the admin. Sign-up can be
+  open, invite-only or closed.
+- Add-ons installed per user, by URL, stored encrypted on the server
+- Search across metadata add-ons, in sections for tracks, albums, artists
+  and playlists, with recent searches
 - Artist and album pages
-- Play queue
-- Player with seek
-- Audio-quality setting
+- Playlists, private or public; follow other users' public playlists
+- Liked songs, saved albums and followed artists
+- Listening history, recently played and listening stats
+- Queue, playback state and settings synced across devices
+- Server-side cache of add-on responses, and prefetching of upcoming streams
+  and metadata
 - Responsive layout for desktop and mobile
 
-## Run
+## Development
 
 With Nix:
 
 ```
 nix develop
 pnpm install     # first time only
-just dev         # http://localhost:5173, also reachable from the LAN
-just check       # tests, type check and production build
+just dev         # server on :7000, web app on http://localhost:5173 (also on the LAN)
+just check       # tests, type checks and production builds
 ```
 
 Without Nix you need Node 22 and pnpm:
 
 ```
 pnpm install
-pnpm dev         # development server
-pnpm test        # unit tests
-pnpm build       # production build in dist/
+pnpm dev:server  # API server on port 7000, restarts on changes
+pnpm dev         # web app on port 5173; proxies /api to the server
+pnpm test
 ```
 
-The build in `dist/` is a set of static files that any web server can host.
+In development the server stores its database in `.dev/freeband.db` and
+generates a secret key in `.dev/secret.key`.
 
-## Install an add-on
+## Production
 
-1. Open the **Add-ons** screen.
-2. Paste the add-on's URL, for example `https://example.org`, and install
-   it. The client fetches `manifest.json` from that address.
-3. Install at least one metadata add-on (to search and browse) and one stream
-   add-on (to play).
+```
+pnpm install
+pnpm build && pnpm build:server
+NODE_ENV=production FREEBAND_SECRET_KEY=... pnpm start
+```
 
-Some add-ons need per-user settings. Those have a configure page that produces
-a personal URL; paste that URL instead, and treat it as a secret if it holds
-credentials. Installed add-ons are stored in the browser, and their manifests
-are refetched when the app starts.
+(`just build` and `just start` do the same.) The server listens on port 7000,
+serves the API under `/api` and the built web app from `dist/`, and applies
+pending database migrations at start-up.
 
-In development builds the Add-ons screen also offers shortcuts for add-ons
-running on local ports.
+Generate a key with `openssl rand -base64 32`.
+
+### Docker
+
+```
+docker build -t freeband-web .
+docker run -d -p 7000:7000 -v freeband:/data \
+  -e FREEBAND_SECRET_KEY=... freeband-web
+```
+
+The image runs as a non-root user and keeps its SQLite database in the
+`/data` volume.
+
+## Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `NODE_ENV` | | `production` requires `FREEBAND_SECRET_KEY` |
+| `FREEBAND_SECRET_KEY` | dev: `.dev/secret.key` | 32 bytes, base64 or hex; encrypts stored add-on URLs |
+| `FREEBAND_PORT` | `7000` | Port to listen on |
+| `FREEBAND_HOST` | `0.0.0.0` | Address to listen on |
+| `DATABASE_URL` | `sqlite:.dev/freeband.db` | Database (Docker: `sqlite:/data/freeband.db`) |
+| `FREEBAND_SIGNUP` | `open` | `open`, `invite` or `closed`; the admin's setting overrides it |
+| `FREEBAND_COOKIE_SECURE` | `auto` | `true`, `false`, or `auto` (secure when the request is HTTPS) |
+| `FREEBAND_TRUST_PROXY` | `false` | Trust `X-Forwarded-*` headers from a reverse proxy |
+| `FREEBAND_STATIC_DIR` | `dist` | Built web app to serve |
+| `FREEBAND_TTL_META` | `7d` | Cache lifetime of artist, album and track lookups |
+| `FREEBAND_TTL_SEARCH` | `1d` | Cache lifetime of search results |
+| `FREEBAND_TTL_MANIFEST` | `1h` | How often add-on manifests are refetched |
+| `FREEBAND_TTL_STREAM` | `6h` | Cache lifetime of resolved streams |
+| `FREEBAND_TTL_NOT_FOUND` | `1h` | Cache lifetime of "not found" answers |
+| `FREEBAND_PREFETCH_CONCURRENCY` | `2` | Stream lookups running at once per user |
+| `FREEBAND_PREFETCH_LIMIT` | `50` | Most upcoming tracks one prefetch covers |
+| `FREEBAND_PREFETCH_QUEUE_AHEAD` | `3` | Upcoming tracks for which a stream add-on may start a download |
+| `FREEBAND_PROTOCOL` | `../protocol` | Protocol repository, for `just gen` only |
+
+Durations take a number of seconds or a suffix: `90s`, `15m`, `6h`, `7d`.
+
+## Database and migrations
+
+SQLite is the default and the only database supported out of the box. Set
+`DATABASE_URL=sqlite:/path/to/freeband.db`. Queries and migrations use only
+portable Kysely; to use another database, add its dialect in
+`server/db/index.ts`.
+
+```
+just migrate          # apply all pending migrations (also done at start-up)
+just migrate down     # undo the last one
+```
+
+To add a migration, create `server/db/migrations/NNNN_name.ts` exporting
+`up(db)` and `down(db)`, list it in `server/db/migrate.ts`, and update the
+types in `server/db/schema.ts`.
+
+## Security
+
+- Add-on URLs can hold a user's credentials, so they are stored encrypted
+  with `FREEBAND_SECRET_KEY`. Keep the key safe and back it up: if it is lost
+  or changed, stored add-ons can no longer be read and users must install
+  them again.
+- Serve Freeband over HTTPS. Behind a reverse proxy, set
+  `FREEBAND_TRUST_PROXY=true` so client addresses (used for sign-in rate
+  limiting) and HTTPS detection (used for secure cookies) are correct.
+- The server fetches add-on URLs that users enter. On a shared instance,
+  restrict sign-up and keep the server away from internal services it should
+  not reach.
 
 ## Protocol and add-ons
 
-The client talks to add-ons only through the protocol defined in
+The app talks to add-ons only through the protocol defined in
 <https://github.com/freeband-music/protocol>, which also explains how the
 whole system fits together and how to write an add-on.
 
@@ -73,11 +143,6 @@ FREEBAND_PROTOCOL=/path/to/protocol just gen
 ```
 
 An example metadata add-on is at <https://github.com/freeband-music/addon-musicbrainz>.
-
-## Status
-
-Early. The features above work in development, but the app has not yet been
-systematically tested across browsers.
 
 ## Responsibility
 
