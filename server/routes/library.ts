@@ -7,6 +7,7 @@ import type {
   LibraryResponse,
   LikeLookupResponse,
   LikedTrack,
+  RecentSearchesResponse,
   SavedAlbum,
   TrackSnapshot,
 } from "../../shared/api";
@@ -22,6 +23,11 @@ const likeBody = z.object({ track: trackSnapshotSchema });
 const albumBody = z.object({ album: albumSnapshotSchema });
 const artistBody = z.object({ artist: artistSnapshotSchema });
 const lookupBody = z.object({ trackIds: z.array(itemId).max(1000) });
+const searchKind = z.enum(["query", "track", "album", "artist", "playlist"]);
+const searchBody = z.object({ kind: searchKind, key: z.string().trim().min(1).max(512), payload: z.unknown().optional() });
+const searchQuery = z.object({ kind: searchKind.optional(), key: z.string().min(1).max(512).optional() });
+const RECENT_SEARCHES = 10;
+const MAX_PAYLOAD = 16 * 1024;
 
 type SavedTable = "likes" | "saved_albums" | "followed_artists";
 const keyColumn = { likes: "track_id", saved_albums: "album_id", followed_artists: "artist_id" } as const;
@@ -102,6 +108,60 @@ export default async function libraryRoutes(app: FastifyInstance): Promise<void>
       .where("track_id", "in", trackIds)
       .execute();
     return { liked: rows.map((r) => r.track_id) };
+  });
+
+  app.get("/library/recent-searches", async (req): Promise<RecentSearchesResponse> => {
+    const rows = await db
+      .selectFrom("recent_searches")
+      .selectAll()
+      .where("user_id", "=", currentUser(req).id)
+      .orderBy("created_at", "desc")
+      .limit(RECENT_SEARCHES)
+      .execute();
+    return {
+      searches: rows.map((r) => ({ kind: r.kind, key: r.key, payload: JSON.parse(r.payload_json), createdAt: r.created_at })),
+    };
+  });
+
+  app.post("/library/recent-searches", async (req, reply) => {
+    const userId = currentUser(req).id;
+    const body = parse(searchBody, req.body);
+    const payload_json = JSON.stringify(body.payload ?? null);
+    if (payload_json.length > MAX_PAYLOAD) throw badRequest("payload is too large");
+    const created_at = now().toISOString();
+    await db.transaction().execute(async (trx) => {
+      await trx
+        .insertInto("recent_searches")
+        .values({ user_id: userId, kind: body.kind, key: body.key, payload_json, created_at })
+        .onConflict((oc) => oc.columns(["user_id", "kind", "key"]).doUpdateSet({ payload_json, created_at }))
+        .execute();
+      const old = await trx
+        .selectFrom("recent_searches")
+        .select(["kind", "key"])
+        .where("user_id", "=", userId)
+        .orderBy("created_at", "desc")
+        .offset(RECENT_SEARCHES)
+        .limit(1000)
+        .execute();
+      for (const o of old) {
+        await trx
+          .deleteFrom("recent_searches")
+          .where("user_id", "=", userId)
+          .where("kind", "=", o.kind)
+          .where("key", "=", o.key)
+          .execute();
+      }
+    });
+    return reply.status(204).send();
+  });
+
+  app.delete("/library/recent-searches", async (req, reply) => {
+    const { kind, key } = parse(searchQuery, req.query);
+    let q = db.deleteFrom("recent_searches").where("user_id", "=", currentUser(req).id);
+    if (kind) q = q.where("kind", "=", kind);
+    if (key) q = q.where("key", "=", key);
+    await q.execute();
+    return reply.status(204).send();
   });
 
   const routes = [

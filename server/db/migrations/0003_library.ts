@@ -95,6 +95,7 @@ export async function up(db: Kysely<unknown>): Promise<void> {
   await db.schema
     .createTable("playback_state")
     .addColumn("user_id", "text", (c) => c.primaryKey().references(userRef).onDelete("cascade"))
+    .addColumn("queue_json", "text", (c) => c.notNull())
     .addColumn("state_json", "text", (c) => c.notNull())
     .addColumn("updated_at", "text", (c) => c.notNull())
     .execute();

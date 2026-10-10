@@ -446,3 +446,73 @@ export interface StatsResponse {
   topTracks: TrackStat[];
   topArtists: ArtistStat[];
 }
+
+// Recent searches, settings and playback sync.
+
+export type RecentSearchKind = "query" | "track" | "album" | "artist" | "playlist";
+
+/** One of the user's last 10 searches or opened results; the same kind and key appear once. */
+export interface RecentSearch {
+  kind: RecentSearchKind;
+  /** The query text, or the item's ID. */
+  key: string;
+  /** What the client needs to show it (a snapshot or a playlist summary); null for queries. */
+  payload: unknown;
+  createdAt: string;
+}
+
+/** `GET library/recent-searches`, newest first. */
+export interface RecentSearchesResponse {
+  searches: RecentSearch[];
+}
+
+/** `POST library/recent-searches`. `DELETE library/recent-searches?kind=&key=` removes one; without them, all. */
+export interface AddRecentSearchRequest {
+  kind: RecentSearchKind;
+  key: string;
+  payload?: unknown;
+}
+
+/** Client settings, stored as given (at most 64 KiB of JSON). */
+export type UserSettings = Record<string, unknown>;
+
+/** `GET` and `PUT me/settings` (PUT replaces them). */
+export interface SettingsResponse {
+  settings: UserSettings;
+  updatedAt: string | null;
+}
+
+export type RepeatMode = "off" | "all" | "one";
+
+export interface PlaybackState {
+  /** At most 1000 tracks, in play order. */
+  queue: TrackSnapshot[];
+  /** With shuffle on: the queue's indexes in their unshuffled order. */
+  originalOrder?: number[];
+  index: number;
+  positionMs: number;
+  shuffle: boolean;
+  repeat: RepeatMode;
+  /** 0 to 1. */
+  volume: number;
+  muted: boolean;
+  context?: PlayContext;
+}
+
+/**
+ * `PUT me/playback`. Sent often, so `queue` and `originalOrder` may be
+ * left out to keep the stored queue; send them whenever the queue changes.
+ */
+export type PlaybackUpdate = Omit<PlaybackState, "queue" | "originalOrder"> &
+  Partial<Pick<PlaybackState, "queue" | "originalOrder">>;
+
+/** `GET me/playback`; null before the first PUT. */
+export interface PlaybackResponse {
+  playback: PlaybackState | null;
+  updatedAt: string | null;
+}
+
+/** Answer to `PUT me/playback`. */
+export interface PlaybackSavedResponse {
+  updatedAt: string;
+}

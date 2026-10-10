@@ -151,8 +151,12 @@ export interface UserSettingsTable {
   updated_at: string;
 }
 
+/** The queue is kept apart from the small, often-written state. */
 export interface PlaybackStateTable {
   user_id: string;
+  /** `{ queue, originalOrder }` */
+  queue_json: string;
+  /** Index, position, shuffle, repeat, volume and context. */
   state_json: string;
   updated_at: string;
 }
