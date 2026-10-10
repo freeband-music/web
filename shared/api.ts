@@ -313,3 +313,66 @@ export interface MovePlaylistTracksRequest {
   entryIds: string[];
   beforeEntryId: string | null;
 }
+
+export interface LikedTrack {
+  track: TrackSnapshot;
+  likedAt: string;
+}
+
+/** `GET library/likes`, newest first. */
+export interface LikesResponse {
+  tracks: LikedTrack[];
+}
+
+/** `PUT library/likes/:trackId`; `track.id` must equal the path's ID. */
+export interface LikeRequest {
+  track: TrackSnapshot;
+}
+
+/** `POST library/likes/lookup`: which of these tracks are liked (for heart icons in lists). */
+export interface LikeLookupRequest {
+  trackIds: string[];
+}
+
+export interface LikeLookupResponse {
+  liked: string[];
+}
+
+export interface SavedAlbum {
+  album: AlbumSnapshot;
+  savedAt: string;
+}
+
+/** `GET library/albums`, newest first. */
+export interface SavedAlbumsResponse {
+  albums: SavedAlbum[];
+}
+
+/** `PUT library/albums/:albumId`. */
+export interface SaveAlbumRequest {
+  album: AlbumSnapshot;
+}
+
+export interface FollowedArtist {
+  artist: ArtistSnapshot;
+  followedAt: string;
+}
+
+/** `GET library/artists`, newest first. */
+export interface FollowedArtistsResponse {
+  artists: FollowedArtist[];
+}
+
+/** `PUT library/artists/:artistId`. */
+export interface FollowArtistRequest {
+  artist: ArtistSnapshot;
+}
+
+/** `GET library`: everything the Library screen shows; sorting and filtering happen in the client. */
+export interface LibraryResponse {
+  playlists: PlaylistSummary[];
+  followedPlaylists: PlaylistSummary[];
+  albums: SavedAlbum[];
+  artists: FollowedArtist[];
+  likedCount: number;
+}
