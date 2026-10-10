@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 const serverPort = process.env.FREEBAND_PORT ?? "7000";
 
 export default defineConfig({
-  base: "./",
+  base: "/",
   plugins: [react()],
   server: {
     proxy: { "/api": `http://localhost:${serverPort}` },

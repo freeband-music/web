@@ -1,9 +1,10 @@
 import { createRoot } from "react-dom/client";
-import { useAddons } from "./store/addons";
+import { startSession } from "./store/session";
 import { App } from "./ui/App";
+import { startRouter } from "./ui/router";
 import "./ui/styles.css";
 
-// Pick up manifest changes in the background; startup does not wait for it.
-void useAddons.getState().refresh();
+startRouter();
+startSession();
 
 createRoot(document.getElementById("root")!).render(<App />);

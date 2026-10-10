@@ -79,7 +79,7 @@ input[type="range"] {
 }
 
 .status a,
-.muted a[href^="#/addons"],
+.muted a[href="/addons"],
 .dev-tools a,
 .addons a {
   color: var(--accent);
@@ -196,6 +196,10 @@ button:disabled {
   color: var(--text);
 }
 
+.icon-button.active {
+  color: var(--accent);
+}
+
 .icon-button.primary {
   background: var(--text);
   color: #000;
@@ -207,7 +211,9 @@ button:disabled {
 }
 
 input[type="search"],
-input[type="url"] {
+input[type="url"],
+input[type="text"],
+input[type="password"] {
   width: 100%;
   padding: 10px 16px;
   border: 1px solid var(--line);
@@ -217,7 +223,9 @@ input[type="url"] {
 }
 
 input[type="search"]:focus,
-input[type="url"]:focus {
+input[type="url"]:focus,
+input[type="text"]:focus,
+input[type="password"]:focus {
   border-color: var(--accent);
 }
 
@@ -351,6 +359,47 @@ input[type="url"]:focus {
 .track-actions {
   display: flex;
   flex: none;
+}
+
+/* Sign-in and simple forms */
+.auth {
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.list-links {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.list-links li {
+  padding: 6px 0;
 }
 
 /* Add-ons and settings */

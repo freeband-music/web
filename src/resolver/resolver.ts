@@ -1,5 +1,5 @@
-import type { StreamFanout } from "../addons/client";
-import type { Quality, Stream, Track, TrackSummary } from "../types";
+import type { StreamResult } from "../../shared/api";
+import type { Quality, Stream } from "../types";
 
 export type QualityPreset = "addon" | "data-saver" | "balanced" | "best";
 
@@ -11,37 +11,6 @@ export type ResolveResult =
   | { kind: "not_found" }
   | { kind: "no_addon" }
   | { kind: "error"; message: string };
-
-/** The part of the add-on client the resolver needs. */
-export interface StreamSource {
-  hasResource(resource: "stream"): boolean;
-  getTrack(id: string, timeoutMs?: number): Promise<Track>;
-  getStreams(track: TrackSummary): Promise<StreamFanout>;
-}
-
-const DETAILS_TIMEOUT_MS = 5000;
-
-/**
- * A track without a track number (typically one from search results) is
- * looked up first so the stream request carries full details. If the lookup
- * fails, the track is used as it is.
- */
-async function withDetails(source: StreamSource, track: TrackSummary): Promise<TrackSummary> {
-  if (track.trackNumber) return track;
-  try {
-    const full = await source.getTrack(track.id, DETAILS_TIMEOUT_MS);
-    return {
-      ...track,
-      trackNumber: full.trackNumber ?? track.trackNumber,
-      discNumber: full.discNumber ?? track.discNumber,
-      durationMs: full.durationMs ?? track.durationMs,
-      isrc: full.isrc ?? track.isrc,
-      album: full.album ? { ...track.album, ...full.album } : track.album,
-    };
-  } catch {
-    return track;
-  }
-}
 
 type Tier = "hi-res" | "cd" | "high" | "low";
 
@@ -86,27 +55,16 @@ export function sortStreams<T extends Stream>(streams: T[], preset: QualityPrese
     .map((entry) => entry.stream);
 }
 
-export async function resolveTrack(
-  source: StreamSource,
-  track: TrackSummary,
-  preset: QualityPreset,
-): Promise<ResolveResult> {
-  if (!source.hasResource("stream")) return { kind: "no_addon" };
-  let fanout: StreamFanout;
-  try {
-    fanout = await source.getStreams(await withDetails(source, track));
-  } catch (error) {
-    return { kind: "error", message: error instanceof Error ? error.message : String(error) };
+/** What the player should do with the server's answer to a stream request. */
+export function toResolveResult(result: StreamResult, preset: QualityPreset): ResolveResult {
+  switch (result.kind) {
+    case "ok":
+      return result.streams.length > 0
+        ? { kind: "ok", streams: sortStreams(result.streams, preset) }
+        : { kind: "not_found" };
+    case "not_cached":
+      return { kind: "not_found" };
+    default:
+      return result;
   }
-  const { responses, errors } = fanout;
-
-  const playable = responses
-    .filter((r) => r.response.status === "ok")
-    .flatMap((r) => r.response.streams);
-  if (playable.length > 0) return { kind: "ok", streams: sortStreams(playable, preset) };
-
-  const queued = responses.find((r) => r.response.status === "queued");
-  if (queued) return { kind: "queued", message: queued.response.message };
-  if (responses.length === 0 && errors.length > 0) return { kind: "error", message: errors[0].message };
-  return { kind: "not_found" };
 }

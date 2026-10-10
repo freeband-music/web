@@ -1,10 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, type FormEvent } from "react";
 import { create } from "zustand";
-import type { SearchResult } from "../addons/client";
-import { addonClient } from "../store/addons";
+import type { AddonSearchResponse } from "../../shared/api";
+import { content, errorMessage } from "../api/client";
+import { useLibrary } from "../store/library";
 import { usePlayback } from "../store/playback";
-import { artistNames, Cover, IconButton, TrackRow } from "./common";
+import { trackSnapshot } from "../snapshots";
+import { artistNames, Cover, IconButton, LikeButton, TrackRow, useLikeLookup } from "./common";
 import { links } from "./router";
+import { SEARCH_INPUT_ATTR } from "./shortcuts";
 
 const DEBOUNCE_MS = 400;
 
@@ -13,7 +16,8 @@ interface SearchState {
   /** The query the shown result belongs to. */
   searched: string;
   loading: boolean;
-  result: SearchResult | null;
+  result: AddonSearchResponse | null;
+  error?: string;
   setQuery(query: string): void;
   run(query: string): Promise<void>;
 }
@@ -31,15 +35,23 @@ const useSearch = create<SearchState>()((set, get) => ({
       return;
     }
     set({ loading: true });
-    const result = await addonClient.search(query);
-    if (get().query.trim() === query) set({ searched: query, result, loading: false });
+    try {
+      const result = await content.search(query);
+      if (get().query.trim() === query) set({ searched: query, result, loading: false, error: undefined });
+    } catch (error) {
+      if (get().query.trim() === query) set({ searched: query, result: null, loading: false, error: errorMessage(error) });
+    }
   },
 }));
 
 export function SearchScreen() {
-  const { query, searched, loading, result, setQuery, run } = useSearch();
-  const playTrack = usePlayback((s) => s.playTrack);
-  const addTrack = usePlayback((s) => s.addTrack);
+  const { query, searched, loading, result, error, setQuery, run } = useSearch();
+  const recent = useLibrary((s) => s.recentSearches);
+  const { playTrack, playNext, addToQueue } = usePlayback.getState();
+  const remember = () => {
+    const text = query.trim();
+    if (text) void useLibrary.getState().addRecentSearch("query", text).catch(() => {});
+  };
 
   useEffect(() => {
     const wanted = query.trim();
@@ -49,27 +61,53 @@ export function SearchScreen() {
   }, [query, searched, run]);
 
   const found = result?.results;
+  useLikeLookup(found?.tracks.map((t) => t.id) ?? []);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    remember();
+  }
   const empty = found && found.tracks.length + found.albums.length + found.artists.length === 0;
 
   return (
     <div className="screen">
-      <input
-        className="search-box"
-        type="search"
-        placeholder="Search tracks, albums and artists"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        autoFocus
-      />
+      <form onSubmit={submit}>
+        <input
+          className="search-box"
+          type="search"
+          placeholder="Search tracks, albums and artists"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          autoFocus
+          {...{ [SEARCH_INPUT_ATTR]: "" }}
+        />
+      </form>
+      {!query.trim() && recent.some((r) => r.kind === "query") && (
+        <section>
+          <h2>Recent searches</h2>
+          <ul className="list-links">
+            {recent
+              .filter((r) => r.kind === "query")
+              .map((r) => (
+                <li key={r.key}>
+                  <button className="link-button" onClick={() => setQuery(r.key)}>
+                    {r.key}
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </section>
+      )}
       {loading && <p className="muted">Searching…</p>}
+      {error && <p className="status error">{error}</p>}
       {result?.asked === 0 && (
         <p className="muted">
           No search add-on installed. <a href={links.addons}>Open Add-ons</a>
         </p>
       )}
       {result?.errors.map((failure) => (
-        <p key={failure.addon.baseUrl} className="status error">
-          {failure.addon.manifest.name}: {failure.message}
+        <p key={failure.addonId} className="status error">
+          {failure.name}: {failure.message}
         </p>
       ))}
       {empty && result.asked > 0 && result.errors.length < result.asked && (
@@ -86,8 +124,17 @@ export function SearchScreen() {
                 track={track}
                 lead={<Cover src={track.album?.cover} />}
                 showAlbum
-                onPlay={() => playTrack(track)}
-                actions={<IconButton icon="add" label="Add to queue" onClick={() => addTrack(track)} />}
+                onPlay={() => {
+                  remember();
+                  playTrack(trackSnapshot(track));
+                }}
+                actions={
+                  <>
+                    <LikeButton track={track} />
+                    <IconButton icon="next" label="Play next" onClick={() => playNext([trackSnapshot(track)])} />
+                    <IconButton icon="add" label="Add to queue" onClick={() => addToQueue([trackSnapshot(track)])} />
+                  </>
+                }
               />
             ))}
           </ul>
@@ -98,7 +145,7 @@ export function SearchScreen() {
           <h2>Albums</h2>
           <div className="grid">
             {found.albums.map((album) => (
-              <a key={album.id} className="card" href={links.album(album.id)}>
+              <a key={album.id} className="card" href={links.album(album.id)} onClick={remember}>
                 <Cover src={album.cover} />
                 <span className="card-title">{album.title}</span>
                 <span className="muted">
@@ -114,7 +161,7 @@ export function SearchScreen() {
           <h2>Artists</h2>
           <div className="grid">
             {found.artists.map((artist) => (
-              <a key={artist.id} className="card" href={links.artist(artist.id)}>
+              <a key={artist.id} className="card" href={links.artist(artist.id)} onClick={remember}>
                 <Cover src={artist.image} round />
                 <span className="card-title">{artist.name}</span>
               </a>

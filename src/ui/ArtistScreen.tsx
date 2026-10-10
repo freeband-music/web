@@ -1,9 +1,12 @@
-import { addonClient } from "../store/addons";
+import { content } from "../api/client";
+import { useLibrary } from "../store/library";
+import { artistSnapshot } from "../snapshots";
 import { Cover, useAsync } from "./common";
 import { links } from "./router";
 
 export function ArtistScreen({ id }: { id: string }) {
-  const artist = useAsync(() => addonClient.getArtist(id), id);
+  const artist = useAsync(() => content.artist(id), id);
+  const followed = useLibrary((s) => s.artists.some((a) => a.artist.id === id));
   if (artist.loading) return <p className="screen muted">Loading…</p>;
   if ("error" in artist) return <p className="screen status error">{artist.error}</p>;
   const { name, image, albums } = artist.data;
@@ -14,6 +17,14 @@ export function ArtistScreen({ id }: { id: string }) {
         <div>
           <p className="muted">Artist</p>
           <h1>{name}</h1>
+          <button
+            className="button"
+            onClick={() =>
+              void useLibrary.getState().setArtistFollowed(artistSnapshot(artist.data), !followed).catch(() => {})
+            }
+          >
+            {followed ? "Following" : "Follow"}
+          </button>
         </div>
       </header>
       <h2>Albums</h2>

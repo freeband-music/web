@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { errorMessage } from "../api/client";
 import { useAddons } from "../store/addons";
 import { IconButton } from "./common";
 
@@ -6,23 +7,28 @@ const DEV_ADDON_PORTS = [7003, 7001];
 const DEV_STREAM_CONFIGURE_URL = "http://localhost:7002/configure";
 
 export function AddonsScreen() {
-  const { addons, offline, install, remove, move } = useAddons();
+  const { addons, errors, install, remove, move, setEnabled } = useAddons();
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
-  async function installFrom(target: string) {
+  async function run(action: () => Promise<unknown>) {
     setBusy(true);
     setError(undefined);
     try {
-      await install(target);
-      setUrl("");
+      await action();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      setError(errorMessage(cause));
     } finally {
       setBusy(false);
     }
   }
+
+  const installFrom = (target: string) =>
+    run(async () => {
+      await install(target);
+      setUrl("");
+    });
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -33,8 +39,8 @@ export function AddonsScreen() {
     <div className="screen">
       <h1>Add-ons</h1>
       <p className="muted">
-        Add-ons provide search, album and artist details, and streams. Paste an add-on's URL to install it. Add-ons
-        higher in the list are asked first.
+        Add-ons provide search, album and artist details, and streams. Paste an add-on's URL to install it; it is stored
+        with your account. Add-ons higher in the list are asked first.
       </p>
       <form className="install" onSubmit={submit}>
         <input
@@ -71,10 +77,18 @@ export function AddonsScreen() {
       {addons.length === 0 && <p className="muted">No add-ons installed yet.</p>}
       <ul className="addons">
         {addons.map((addon, index) => (
-          <li key={addon.baseUrl}>
+          <li key={addon.id}>
+            <input
+              type="checkbox"
+              checked={addon.enabled}
+              onChange={(event) => void run(() => setEnabled(addon.id, event.target.checked))}
+              aria-label={addon.enabled ? "Disable" : "Enable"}
+              title={addon.enabled ? "Enabled" : "Disabled"}
+            />
             <div className="addon-text">
               <strong>{addon.manifest.name}</strong> <span className="muted">v{addon.manifest.version}</span>
-              {offline.includes(addon.baseUrl) && <span className="badge warn"> Offline</span>}
+              {!addon.enabled && <span className="badge"> Disabled</span>}
+              {errors.some((e) => e.addonId === addon.id) && <span className="badge warn"> Offline</span>}
               {addon.manifest.description && <p>{addon.manifest.description}</p>}
               <p className="muted">
                 {addon.manifest.resources.join(", ")} · {addon.baseUrl}
@@ -86,14 +100,19 @@ export function AddonsScreen() {
               )}
             </div>
             <span className="track-actions">
-              <IconButton icon="up" label="Move up" onClick={() => move(index, -1)} disabled={index === 0} />
+              <IconButton
+                icon="up"
+                label="Move up"
+                onClick={() => void run(() => move(index, -1))}
+                disabled={busy || index === 0}
+              />
               <IconButton
                 icon="down"
                 label="Move down"
-                onClick={() => move(index, 1)}
-                disabled={index === addons.length - 1}
+                onClick={() => void run(() => move(index, 1))}
+                disabled={busy || index === addons.length - 1}
               />
-              <IconButton icon="remove" label="Remove" onClick={() => remove(addon.baseUrl)} />
+              <IconButton icon="remove" label="Remove" onClick={() => void run(() => remove(addon.id))} disabled={busy} />
             </span>
           </li>
         ))}

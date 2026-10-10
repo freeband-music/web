@@ -34,6 +34,8 @@ export class Player {
   private readonly audio = new Audio();
   private state: PlayerState = { status: "idle", position: 0, duration: 0 };
   private hasSource = false;
+  /** Position to seek to once the new source's metadata has loaded. */
+  private startAt = 0;
 
   constructor(private readonly events: PlayerEvents) {
     const audio = this.audio;
@@ -48,6 +50,10 @@ export class Player {
       if (this.state.status !== "error") this.update({ status: "paused" });
     });
     on("timeupdate", () => this.update({ position: audio.currentTime }));
+    on("loadedmetadata", () => {
+      if (this.startAt > 0) audio.currentTime = this.startAt;
+      this.startAt = 0;
+    });
     on("durationchange", () => {
       if (Number.isFinite(audio.duration)) this.update({ duration: audio.duration });
     });
@@ -61,9 +67,11 @@ export class Player {
     });
   }
 
-  play(url: string): void {
+  /** Plays a URL, optionally from a position in seconds. */
+  play(url: string, startAt = 0): void {
     this.hasSource = true;
-    this.update({ status: "loading", position: 0, duration: 0 });
+    this.update({ status: "loading", position: startAt, duration: 0 });
+    this.startAt = startAt;
     this.audio.src = url;
     this.start();
   }
@@ -93,6 +101,10 @@ export class Player {
 
   setVolume(volume: number): void {
     this.audio.volume = Math.min(Math.max(volume, 0), 1);
+  }
+
+  setMuted(muted: boolean): void {
+    this.audio.muted = muted;
   }
 
   get loaded(): boolean {

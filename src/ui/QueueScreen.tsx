@@ -1,5 +1,20 @@
+import type { TrackSnapshot } from "../../shared/api";
+import { errorMessage } from "../api/client";
+import { useLibrary } from "../store/library";
 import { usePlayback } from "../store/playback";
 import { Cover, IconButton, NowStatus, TrackRow } from "./common";
+import { links, navigate } from "./router";
+
+async function saveAsPlaylist(tracks: TrackSnapshot[]) {
+  const name = window.prompt("Playlist name");
+  if (!name?.trim()) return;
+  try {
+    const { playlist } = await useLibrary.getState().createPlaylist({ name: name.trim(), tracks });
+    navigate(links.playlist(playlist.id));
+  } catch (error) {
+    window.alert(errorMessage(error));
+  }
+}
 
 export function QueueScreen() {
   const { queue, now, jumpTo, remove, move, clear } = usePlayback();
@@ -9,9 +24,14 @@ export function QueueScreen() {
       <header className="title-row">
         <h1>Queue</h1>
         {queue.items.length > 0 && (
-          <button className="button" onClick={clear}>
-            Clear
-          </button>
+          <span className="dev-tools">
+            <button className="button" onClick={() => void saveAsPlaylist(queue.items.map((i) => i.track))}>
+              Save as playlist
+            </button>
+            <button className="button" onClick={clear}>
+              Clear
+            </button>
+          </span>
         )}
       </header>
       {queue.items.length === 0 && <p className="muted">The queue is empty. Search for something to play.</p>}

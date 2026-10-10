@@ -1,56 +1,67 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { createAddonClient, installAddon, type InstalledAddon } from "../addons/client";
+import type { AddonFailure, AddonInfo } from "../../shared/api";
+import { addons as api } from "../api/client";
+import type { Resource } from "../types";
 
 interface AddonsState {
-  addons: InstalledAddon[];
-  /** Base URLs of add-ons that did not answer the last refresh. Not persisted. */
-  offline: string[];
+  addons: AddonInfo[];
+  /** Add-ons whose manifest could not be fetched on the last refresh. */
+  errors: AddonFailure[];
+  loaded: boolean;
+  load(): Promise<void>;
   /** Refetches every installed manifest; an add-on that fails keeps its stored one. */
   refresh(): Promise<void>;
-  /** Installs an add-on, or refreshes it when the URL is already installed. */
-  install(url: string): Promise<InstalledAddon>;
-  remove(baseUrl: string): void;
-  move(index: number, delta: -1 | 1): void;
+  install(url: string): Promise<AddonInfo>;
+  remove(id: string): Promise<void>;
+  setEnabled(id: string, enabled: boolean): Promise<void>;
+  move(index: number, delta: -1 | 1): Promise<void>;
+  reset(): void;
 }
 
-export const useAddons = create<AddonsState>()(
-  persist(
-    (set, get) => ({
-      addons: [],
-      offline: [],
-      async refresh() {
-        const asked = get().addons.map((a) => a.baseUrl);
-        const settled = await Promise.allSettled(asked.map((url) => installAddon(url)));
-        const fresh = new Map<string, InstalledAddon>();
-        const offline: string[] = [];
-        settled.forEach((result, i) => {
-          if (result.status === "fulfilled") fresh.set(asked[i], { baseUrl: asked[i], manifest: result.value.manifest });
-          else offline.push(asked[i]);
-        });
-        set({ addons: get().addons.map((a) => fresh.get(a.baseUrl) ?? a), offline });
-      },
-      async install(url) {
-        const addon = await installAddon(url);
-        const addons = get().addons;
-        const existing = addons.findIndex((a) => a.baseUrl === addon.baseUrl);
-        set({
-          addons: existing < 0 ? [...addons, addon] : addons.map((a, i) => (i === existing ? addon : a)),
-          offline: get().offline.filter((url) => url !== addon.baseUrl),
-        });
-        return addon;
-      },
-      remove: (baseUrl) => set({ addons: get().addons.filter((a) => a.baseUrl !== baseUrl) }),
-      move(index, delta) {
-        const addons = [...get().addons];
-        const target = index + delta;
-        if (target < 0 || target >= addons.length) return;
-        [addons[index], addons[target]] = [addons[target], addons[index]];
-        set({ addons });
-      },
-    }),
-    { name: "freeband.addons", version: 1, partialize: (state) => ({ addons: state.addons }) },
-  ),
-);
+/** The user's add-ons, stored on the server. Only base URLs are ever shown. */
+export const useAddons = create<AddonsState>()((set, get) => ({
+  addons: [],
+  errors: [],
+  loaded: false,
+  async load() {
+    const { addons } = await api.list();
+    set({ addons, loaded: true });
+  },
+  async refresh() {
+    const { addons, errors } = await api.refresh();
+    set({ addons, errors: errors ?? [], loaded: true });
+  },
+  async install(url) {
+    const { addon } = await api.install(url.trim());
+    set({ addons: [...get().addons, addon] });
+    return addon;
+  },
+  async remove(id) {
+    await api.remove(id);
+    await get().load();
+  },
+  async setEnabled(id, enabled) {
+    const { addon } = await api.update(id, { enabled });
+    set({ addons: get().addons.map((a) => (a.id === id ? addon : a)) });
+  },
+  async move(index, delta) {
+    const ids = get().addons.map((a) => a.id);
+    const target = index + delta;
+    if (target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    const before = get().addons;
+    set({ addons: ids.map((id) => before.find((a) => a.id === id)!) });
+    try {
+      set({ addons: (await api.reorder(ids)).addons });
+    } catch (error) {
+      set({ addons: before });
+      throw error;
+    }
+  },
+  reset: () => set({ addons: [], errors: [], loaded: false }),
+}));
 
-export const addonClient = createAddonClient(() => useAddons.getState().addons);
+/** Whether an enabled add-on offers the resource. */
+export function hasResource(addons: AddonInfo[], resource: Resource): boolean {
+  return addons.some((a) => a.enabled && a.manifest.resources.includes(resource));
+}
