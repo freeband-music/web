@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { AddonFailure, AddonResponse, AddonsResponse } from "../../shared/api";
-import { AddonError } from "../addons/http";
+import { AddonError, UnsupportedProtocolError } from "../addons/http";
 import { BlockedAddonError } from "../addons/network";
+import { toFailure } from "../addons/service";
 import { listAddonRows, refreshManifest, toAddonInfo, writeOrder } from "../addons/store";
 import { normalizeAddonUrl, splitAddonUrl } from "../addons/urls";
 import { currentUser, requireUser } from "../auth/guard";
@@ -50,6 +51,7 @@ export default async function addonRoutes(app: FastifyInstance): Promise<void> {
       manifest = await service.fetchManifest(url);
     } catch (err) {
       if (err instanceof BlockedAddonError) throw badRequest(err.message, "addon_blocked");
+      if (err instanceof UnsupportedProtocolError) throw badRequest(err.message, "addon_unsupported_protocol");
       if (err instanceof AddonError) throw badRequest(err.message, "addon_invalid");
       throw err;
     }
@@ -116,7 +118,7 @@ export default async function addonRoutes(app: FastifyInstance): Promise<void> {
       rows.map((row) =>
         refreshManifest(db, service, row, config.secretKey, now().toISOString()).catch((err: unknown) => {
           if (!(err instanceof AddonError)) throw err;
-          errors.push({ addonId: row.id, name: JSON.parse(row.manifest_json).name, message: err.message });
+          errors.push(toFailure(row.id, JSON.parse(row.manifest_json).name, err));
         }),
       ),
     );

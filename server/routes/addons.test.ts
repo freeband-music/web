@@ -119,5 +119,7 @@ test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch th
   expect(blocked.statusCode).toBe(400);
   expect(blocked.json().error.code).toBe("addon_blocked");
   expect((await call("GET", "/api/search?q=blocked")).json().errors[0].message).toMatch(/private network/);
+  const refreshed = (await call("POST", "/api/addons/refresh", {})).json();
+  expect(refreshed.errors).toMatchObject([{ addonId: install.json().addon.id, code: "blocked" }]);
   await app.close();
 });

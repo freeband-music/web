@@ -128,11 +128,22 @@ export interface AddonInfo {
   manifestFetchedAt: string;
 }
 
+/**
+ * Why an add-on request failed: `unreachable` (no answer, or too slow),
+ * `blocked` (the server refuses add-ons on private networks),
+ * `unsupported_protocol` (the manifest declares a protocol major version this
+ * server does not speak), `error` (any other failure or invalid answer).
+ */
+export type AddonFailureCode = "unreachable" | "blocked" | "unsupported_protocol" | "error";
+
 /** An add-on that failed during a request that asked several. */
 export interface AddonFailure {
   addonId: string;
   name: string;
   message: string;
+  code: AddonFailureCode;
+  /** With `unsupported_protocol`: the version the add-on's manifest declares. */
+  protocolVersion?: string;
 }
 
 export interface InstallAddonRequest {

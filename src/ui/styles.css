@@ -1438,6 +1438,10 @@ input[type="password"]:focus {
   overflow-wrap: anywhere;
 }
 
+.addon-text .badge {
+  margin-left: 6px;
+}
+
 .addon-text p {
   margin: 4px 0 0;
 }

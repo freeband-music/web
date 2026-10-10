@@ -66,7 +66,7 @@ const MAX_REDIRECTS = 5;
 /** An add-on request refused because its host is on a private network. */
 export class BlockedAddonError extends AddonError {
   constructor() {
-    super("This server does not allow add-ons on private network addresses.");
+    super("This server does not allow add-ons on private network addresses.", undefined, "blocked");
   }
 }
 
@@ -97,7 +97,7 @@ export class AddonNetworkGuard {
         const addresses = isIP(host) ? [host] : await this.resolve(host);
         blocked = addresses.length === 0 || addresses.some(isPrivateAddress);
       } catch {
-        throw new AddonError("Could not reach the add-on.");
+        throw new AddonError("Could not reach the add-on.", undefined, "unreachable");
       }
       verdict = { blocked, until: now + LOOKUP_TTL_MS };
       if (this.verdicts.size > 1000) this.verdicts.clear();

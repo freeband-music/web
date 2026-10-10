@@ -1,4 +1,4 @@
-import type { Manifest } from "../../shared/api";
+import type { AddonFailureCode, Manifest } from "../../shared/api";
 
 /** Major protocol version this server speaks. */
 export const PROTOCOL_MAJOR = 0;
@@ -16,8 +16,20 @@ export class AddonError extends Error {
     message: string,
     /** The add-on's HTTP status, when it answered. */
     readonly httpStatus?: number,
+    readonly code: AddonFailureCode = "error",
   ) {
     super(message);
+  }
+}
+
+/** The manifest declares a protocol major version this server does not speak. */
+export class UnsupportedProtocolError extends AddonError {
+  constructor(readonly protocolVersion: string) {
+    super(
+      `This add-on uses protocol version ${protocolVersion}, but this server only supports version ${PROTOCOL_MAJOR}.x.`,
+      undefined,
+      "unsupported_protocol",
+    );
   }
 }
 
@@ -30,14 +42,15 @@ export interface JsonResponse {
 export async function getJson(fetchFn: FetchFn, url: string, timeoutMs: number): Promise<JsonResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const timeout = () => new AddonError(`The add-on did not answer within ${timeoutMs / 1000} seconds.`);
+  const timeout = () =>
+    new AddonError(`The add-on did not answer within ${timeoutMs / 1000} seconds.`, undefined, "unreachable");
   try {
     let response: Response;
     try {
       response = await fetchFn(url, { signal: controller.signal, headers: { Accept: "application/json" } });
     } catch (err) {
       if (err instanceof AddonError) throw err;
-      throw controller.signal.aborted ? timeout() : new AddonError("Could not reach the add-on.");
+      throw controller.signal.aborted ? timeout() : new AddonError("Could not reach the add-on.", undefined, "unreachable");
     }
     let body: unknown;
     try {
@@ -77,10 +90,6 @@ export function validateManifest(data: unknown): Manifest {
   if (Number.isNaN(major)) {
     throw new AddonError(`The add-on has an invalid protocol version "${manifest.protocolVersion}".`);
   }
-  if (major !== PROTOCOL_MAJOR) {
-    throw new AddonError(
-      `This add-on uses protocol version ${manifest.protocolVersion}, but this server only supports version ${PROTOCOL_MAJOR}.x.`,
-    );
-  }
+  if (major !== PROTOCOL_MAJOR) throw new UnsupportedProtocolError(manifest.protocolVersion);
   return manifest;
 }

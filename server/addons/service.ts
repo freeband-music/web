@@ -1,5 +1,6 @@
 import type {
   AddonFailure,
+  AddonFailureCode,
   AddonSearchResponse,
   Manifest,
   SearchResponse,
@@ -12,7 +13,15 @@ import type {
 import { cacheKey, effectiveTtl, type AddonScope, type Cache } from "../cache/cache";
 import type { CacheTtls } from "../config";
 import { HttpError, notFound } from "../http";
-import { AddonError, getJson, META_TIMEOUT_MS, STREAM_TIMEOUT_MS, validateManifest, type FetchFn } from "./http";
+import {
+  AddonError,
+  getJson,
+  META_TIMEOUT_MS,
+  STREAM_TIMEOUT_MS,
+  UnsupportedProtocolError,
+  validateManifest,
+  type FetchFn,
+} from "./http";
 
 type Resource = Manifest["resources"][number];
 type MetaKind = "artist" | "album" | "track";
@@ -28,6 +37,12 @@ export interface ActiveAddon {
 /** Failed requests are remembered briefly so a broken add-on is not asked again at once. */
 const ERROR_TTL_S = 30;
 const DETAILS_TIMEOUT_MS = 5000;
+
+/** What a cached failed request holds. */
+interface CachedError {
+  message: string;
+  code?: AddonFailureCode;
+}
 
 /** What a stream cache entry holds. */
 interface StreamEntry {
@@ -94,8 +109,20 @@ function message(reason: unknown): string {
   return reason instanceof Error ? reason.message : String(reason);
 }
 
+/** What the client is told about an add-on that failed; messages never hold the add-on URL. */
+export function toFailure(addonId: string, name: string, reason: unknown): AddonFailure {
+  const failure: AddonFailure = {
+    addonId,
+    name,
+    message: message(reason),
+    code: reason instanceof AddonError ? reason.code : "error",
+  };
+  if (reason instanceof UnsupportedProtocolError) failure.protocolVersion = reason.protocolVersion;
+  return failure;
+}
+
 function failure(addon: ActiveAddon, reason: unknown): AddonFailure {
-  return { addonId: addon.id, name: addon.manifest.name, message: message(reason) };
+  return toFailure(addon.id, addon.manifest.name, reason);
 }
 
 /** Combines per-add-on stream answers (in add-on order) into one result. */
@@ -137,10 +164,11 @@ export class AddonService {
     timeoutMs = META_TIMEOUT_MS,
   ): Promise<T> {
     const key = cacheKey(resource, addon.scope, params);
-    const hit = await this.cache.get<T | { message: string }>(key);
+    const hit = await this.cache.get<T | CachedError>(key);
     if (hit) {
       if (hit.status === "ok") return hit.value as T;
-      throw new AddonError((hit.value as { message: string }).message, hit.status === "not_found" ? 404 : undefined);
+      const cached = hit.value as CachedError;
+      throw new AddonError(cached.message, hit.status === "not_found" ? 404 : undefined, cached.code);
     }
     return this.cache.dedupe(key, async () => {
       try {
@@ -151,7 +179,7 @@ export class AddonService {
         const notFoundAnswer = err instanceof AddonError && err.httpStatus === 404;
         await this.cache.set(
           key,
-          { message: message(err) },
+          { message: message(err), code: err instanceof AddonError ? err.code : "error" } satisfies CachedError,
           notFoundAnswer ? "not_found" : "error",
           notFoundAnswer ? this.ttl.notFound : ERROR_TTL_S,
         );
