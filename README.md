@@ -99,6 +99,13 @@ The image runs as a non-root user and keeps its SQLite database in the
 
 Durations take a number of seconds or a suffix: `90s`, `15m`, `6h`, `7d`.
 
+Prefetch looks up streams for the whole upcoming queue, up to
+`FREEBAND_PREFETCH_LIMIT` tracks. Only the first
+`FREEBAND_PREFETCH_QUEUE_AHEAD` may start a download; later tracks are asked
+with `queue=false`, so stream add-ons answer only what is playable now. Add-ons
+on protocol versions before 0.3.0 do not support that and are asked only for
+the first tracks.
+
 ## Database and migrations
 
 SQLite is the default and the only database supported out of the box. Set

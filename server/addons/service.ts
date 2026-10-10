@@ -36,6 +36,12 @@ interface StreamEntry {
   queueAllowed: boolean;
 }
 
+/** True when the add-on understands `queue=false` on stream requests (protocol 0.3.0 and later). */
+export function supportsNoQueue(manifest: Manifest): boolean {
+  const [major, minor] = manifest.protocolVersion.split(".").map((part) => Number.parseInt(part, 10));
+  return major > 0 || (major === 0 && minor >= 3);
+}
+
 export function serves(addon: ActiveAddon, resource: Resource, id?: string): boolean {
   if (!addon.manifest.resources.includes(resource)) return false;
   // An empty prefix list means the add-on accepts any ID.
@@ -232,10 +238,15 @@ export class AddonService {
     return entries.every((e) => e !== undefined && this.usable(e.value, true));
   }
 
+  /** True when some add-on serving this track can be asked for its streams without queueing a download. */
+  canCheckWithoutQueue(addons: ActiveAddon[], trackId: string): boolean {
+    return addons.some((a) => serves(a, "stream", trackId) && supportsNoQueue(a.manifest));
+  }
+
   /**
-   * Asks the stream add-ons for a track. With `allowQueue` false no add-on is
-   * contacted: protocol 0.2.0 has no way to ask for cached sources only, and
-   * a stream add-on may queue a download on any request.
+   * Asks the stream add-ons for a track. With `allowQueue` false, add-ons
+   * that support it are sent `queue=false` (answer only what is playable now);
+   * older add-ons are not contacted, as they may queue a download on any request.
    */
   async streams(addons: ActiveAddon[], track: TrackSummary, allowQueue: boolean): Promise<StreamResolveResponse> {
     const asked = addons.filter((a) => serves(a, "stream", track.id));
@@ -247,11 +258,13 @@ export class AddonService {
         const key = this.streamKey(addon, track.id);
         const hit = await this.cache.get<StreamEntry>(key);
         if (hit && this.usable(hit.value, allowQueue)) return { response: hit.value.response };
-        if (!allowQueue) return { notCached: true as const };
+        if (!allowQueue && !supportsNoQueue(addon.manifest)) return { notCached: true as const };
         cached = false;
         details ??= this.trackDetails(addons, track);
+        // Queue-allowed and queue-free requests are deduplicated separately: their answers differ.
+        const flightKey = allowQueue ? key : `${key}:noqueue`;
         try {
-          const response = await this.cache.dedupe(key, () => this.fetchStreams(addon, key, details!));
+          const response = await this.cache.dedupe(flightKey, () => this.fetchStreams(addon, key, details!, allowQueue));
           return { response };
         } catch (err) {
           return { error: message(err) };
@@ -261,19 +274,26 @@ export class AddonService {
     return { result: combineStreams(answers), cached };
   }
 
-  private async fetchStreams(addon: ActiveAddon, key: string, details: Promise<TrackSummary>): Promise<StreamResponse> {
+  private async fetchStreams(
+    addon: ActiveAddon,
+    key: string,
+    details: Promise<TrackSummary>,
+    queueAllowed: boolean,
+  ): Promise<StreamResponse> {
     const track = await details;
-    const path = `/stream/track/${idSegment(track.id)}?${streamQuery(track)}`;
+    const queue = queueAllowed ? "" : "&queue=false";
+    const path = `/stream/track/${idSegment(track.id)}?${streamQuery(track)}${queue}`;
     const res = await getJson(this.fetchFn, addon.url + path, STREAM_TIMEOUT_MS);
     const data = res.body as Partial<StreamResponse>;
     const streams = Array.isArray(data.streams) ? data.streams : [];
     const status = data.status === "ok" && streams.length === 0 ? "not_found" : (data.status ?? "not_found");
     const response: StreamResponse = { ...data, status, streams } as StreamResponse;
-    // A queued download should become playable soon, so it is not cached.
+    // A queued download should become playable soon, so it is not cached. A
+    // not_found given without queueing does not block a later queue-allowed request (see `usable`).
     if (status === "ok") {
-      await this.cache.set(key, { response, queueAllowed: true }, "ok", effectiveTtl(this.ttl.stream, res.cacheControl));
+      await this.cache.set(key, { response, queueAllowed }, "ok", effectiveTtl(this.ttl.stream, res.cacheControl));
     } else if (status === "not_found") {
-      await this.cache.set(key, { response, queueAllowed: true }, "not_found", this.ttl.notFound);
+      await this.cache.set(key, { response, queueAllowed }, "not_found", this.ttl.notFound);
     }
     return response;
   }

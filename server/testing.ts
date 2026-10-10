@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "./app";
+import type { Deps } from "./context";
 import { DEFAULT_PREFETCH, DEFAULT_TTLS, type Config } from "./config";
 import { createDb } from "./db/index";
 import { migrateToLatest } from "./db/migrate";
@@ -23,11 +24,11 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
 }
 
 /** An app on a fresh, migrated in-memory database. */
-export async function testApp(overrides: Partial<Config> = {}): Promise<FastifyInstance> {
+export async function testApp(overrides: Partial<Config> = {}, deps: Omit<Deps, "db"> = {}): Promise<FastifyInstance> {
   const config = testConfig(overrides);
   const db = createDb(config.databaseUrl);
   await migrateToLatest(db);
-  const app = await buildApp(config, { db });
+  const app = await buildApp(config, { ...deps, db });
   app.addHook("onClose", () => db.destroy());
   return app;
 }

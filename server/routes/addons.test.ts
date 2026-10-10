@@ -39,7 +39,16 @@ afterAll(() => {
 });
 
 test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch through the API", async () => {
-  const app = await testApp();
+  const requested: string[] = [];
+  const app = await testApp(
+    { prefetch: { concurrency: 2, limit: 50, queueAhead: 1 } },
+    {
+      fetch: (input, init) => {
+        requested.push(input);
+        return fetch(input, init);
+      },
+    },
+  );
   const signup = await app.inject({
     method: "POST",
     url: "/api/auth/signup",
@@ -62,27 +71,38 @@ test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch th
   expect((await call("GET", "/api/meta/album/fake:album:1")).json().tracks).toHaveLength(2);
   expect((await call("GET", "/api/meta/album/fake:album:9")).statusCode).toBe(404);
 
-  // Nothing cached yet: a request that may not queue does not reach the add-on.
-  expect((await call("POST", "/api/stream", { track: track1, allowQueue: false })).json().result).toEqual({
-    kind: "not_cached",
-  });
+  // Prefetch the rest of the queue: the next track may queue a download, later ones are asked with queue=false.
+  const track3 = {
+    id: "fake:track:3",
+    title: "Prepared on request",
+    artists: [{ id: "fake:artist:1", name: "Fake" }],
+    trackNumber: "1",
+  };
+  const pre = await call("POST", "/api/prefetch", { tracks: [track1, track2, track3], current: 0 });
+  expect(pre.statusCode).toBe(202);
+  expect(pre.json().planned).toBe(2);
+  const streamRequests = (id: string) => requested.filter((u) => u.includes(`/stream/track/${id}?`));
+  for (let i = 0; i < 50 && streamRequests("fake:track:3").length === 0; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  expect(streamRequests("fake:track:2").every((u) => !u.includes("queue=false"))).toBe(true);
+  expect(streamRequests("fake:track:3").length).toBeGreaterThan(0);
+  expect(streamRequests("fake:track:3").every((u) => u.includes("queue=false"))).toBe(true);
+
+  // Without queueing the add-on has nothing ready; that answer does not block a request that may queue.
+  const quiet = (await call("POST", "/api/stream", { track: track3, allowQueue: false })).json();
+  expect(quiet.result.kind).toBe("not_found");
+  expect((await call("POST", "/api/stream", { track: track3 })).json().result.kind).toBe("queued");
+
+  for (let i = 0; i < 50; i++) {
+    if ((await call("POST", "/api/stream", { track: track2, allowQueue: false })).json().cached) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
   const first = (await call("POST", "/api/stream", { track: track1 })).json();
   expect(first.result.kind).toBe("ok");
   expect(first.result.streams[0].match.kind).toBe("exact");
   expect(first.cached).toBe(false);
   expect((await call("POST", "/api/stream", { track: track1 })).json().cached).toBe(true);
-
-  // Prefetch the rest of the queue; the result lands in the stream cache.
-  const pre = await call("POST", "/api/prefetch", { tracks: [track1, track2], current: 0 });
-  expect(pre.statusCode).toBe(202);
-  expect(pre.json().planned).toBe(1);
-  let result;
-  for (let i = 0; i < 50; i++) {
-    result = (await call("POST", "/api/stream", { track: track2, allowQueue: false })).json().result;
-    if (result.kind === "ok") break;
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  expect(result.kind).toBe("ok");
 
   const list = (await call("GET", "/api/addons")).json();
   expect(JSON.stringify(list)).not.toContain("url_encrypted");

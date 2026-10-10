@@ -7,19 +7,24 @@ export interface PrefetchCandidate {
   streamCached: boolean;
   /** The track lacks details the stream request needs (no track number). */
   needsDetails: boolean;
+  /** Some stream add-on for this track can be asked without it queueing a download. */
+  checkWithoutQueue: boolean;
 }
 
 export interface PrefetchStep {
   index: number;
-  /** Ask the stream add-ons (which may queue a download); otherwise only warm the track's details. */
+  /**
+   * The stream add-ons may queue a download. Otherwise only add-ons that can
+   * answer without queueing are asked, and the track's details are warmed.
+   */
   allowQueue: boolean;
 }
 
 /**
  * Which upcoming tracks to look up, in order. Only the first `limit` are
- * considered; the first `queueAhead` of those may reach the stream add-ons.
- * Tracks already cached are skipped, as are later tracks whose details are
- * already complete (nothing to warm for them).
+ * considered; the first `queueAhead` of those may queue a download. Tracks
+ * already cached are skipped, as are later tracks with nothing to do: complete
+ * details and no add-on that can be asked without queueing.
  */
 export function planPrefetch(
   candidates: PrefetchCandidate[],
@@ -27,7 +32,7 @@ export function planPrefetch(
 ): PrefetchStep[] {
   return candidates.slice(0, opts.limit).flatMap((c, index) => {
     const allowQueue = index < opts.queueAhead;
-    if (c.streamCached || (!allowQueue && !c.needsDetails)) return [];
+    if (c.streamCached || (!allowQueue && !c.needsDetails && !c.checkWithoutQueue)) return [];
     return [{ index, allowQueue }];
   });
 }
@@ -78,15 +83,15 @@ export class PrefetchManager {
       window.map(async (t) => ({
         streamCached: await this.service.streamCached(addons, t.id),
         needsDetails: !t.trackNumber,
+        checkWithoutQueue: this.service.canCheckWithoutQueue(addons, t.id),
       })),
     );
     if (controller.signal.aborted) return 0;
     const steps = planPrefetch(candidates, this.config);
-    const run = pool(steps, this.config.concurrency, controller.signal, (step) => {
+    const run = pool(steps, this.config.concurrency, controller.signal, async (step) => {
       const track = window[step.index];
-      return step.allowQueue
-        ? this.service.streams(addons, track, true)
-        : this.service.trackDetails(addons, track);
+      if (step.allowQueue) return this.service.streams(addons, track, true);
+      return this.service.streams(addons, await this.service.trackDetails(addons, track), false);
     });
     this.finish(jobKey, controller, run);
     return steps.length;
