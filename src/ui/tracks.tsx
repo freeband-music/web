@@ -6,7 +6,7 @@ import { errorMessage } from "../api/client";
 import { currentItem } from "../queue/queue";
 import { useLibrary } from "../store/library";
 import { usePlayback } from "../store/playback";
-import { ArtistLinks, Cover, formatTime, IconButton, LikeButton, Mosaic, NowStatus, useLikeLookup } from "./common";
+import { ArtistLinks, Cover, formatTime, IconButton, LikeButton, Mosaic, NowStatus, Spinner, useLikeLookup } from "./common";
 import { Icon } from "./icons";
 import { openMenu, promptDialog, toast, useIsPhone, type MenuAnchor, type MenuContext, type MenuItem, type MenuPage } from "./overlays";
 import { links } from "./router";
@@ -318,7 +318,13 @@ export function TrackList(props: TrackListProps) {
             >
               <span className="trow-lead">
                 <span className="trow-number">
-                  {current && playing ? <span className="eq" aria-label="Playing" /> : (row.lead ?? index + 1)}
+                  {current && playing ? (
+                    <span className="eq" aria-label="Playing" />
+                  ) : current && now.phase === "resolving" ? (
+                    <Spinner label="Finding a stream" />
+                  ) : (
+                    (row.lead ?? index + 1)
+                  )}
                 </span>
                 <button className="trow-play" onClick={() => (current ? usePlayback.getState().toggle() : onPlay(index))} aria-label={current && playing ? "Pause" : `Play ${track.title}`}>
                   <Icon name={current && playing ? "pause" : "play"} />

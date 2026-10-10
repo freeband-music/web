@@ -2,6 +2,7 @@ import { useEffect, type FormEvent, type ReactNode } from "react";
 import { create } from "zustand";
 import type { AddonSearchResponse, AlbumSnapshot, ArtistSnapshot, PlaylistSummary, RecentSearch, TrackSnapshot } from "../../shared/api";
 import { content, errorMessage, playlists as playlistApi } from "../api/client";
+import { hasResource, useAddons } from "../store/addons";
 import { useLibrary } from "../store/library";
 import { usePlayback } from "../store/playback";
 import { albumSnapshot, artistSnapshot, trackSnapshot } from "../snapshots";
@@ -236,16 +237,25 @@ function TopResultCard({ query, entry }: { query: string; entry: Entry }) {
   );
 }
 
+/** Shown instead of results when no enabled add-on can search. */
+function NoSearchAddon() {
+  return (
+    <div className="empty-card">
+      <h2>No metadata add-on installed</h2>
+      <p className="muted">Install a metadata add-on to search for songs, albums and artists.</p>
+      <a className="button primary" href={links.addons}>
+        Open Add-ons
+      </a>
+    </div>
+  );
+}
+
 function Problems({ entry }: { entry: Entry }) {
   const result = entry.result;
   return (
     <>
       {entry.error && <p className="status error">{entry.error}</p>}
-      {result?.asked === 0 && (
-        <p className="muted">
-          No search add-on installed. <a href={links.addons}>Open Add-ons</a>
-        </p>
-      )}
+      {result?.asked === 0 && <NoSearchAddon />}
       {result?.errors.map((failure) => (
         <p key={failure.addonId} className="status error">
           {failure.name}: {failure.message}
@@ -255,10 +265,13 @@ function Problems({ entry }: { entry: Entry }) {
   );
 }
 
+/** Nothing was found, and every add-on asked did answer (otherwise the problems say why). */
 function isEmpty(entry: Entry) {
-  const found = entry.result?.results;
+  const result = entry.result;
+  const found = result?.results;
   const count = (found ? found.tracks.length + found.albums.length + found.artists.length : 0) + (entry.playlists?.length ?? 0);
-  return !entry.loading && !entry.error && count === 0;
+  const answered = result !== undefined && result.asked > 0 && result.errors.length < result.asked;
+  return !entry.loading && !entry.error && answered && count === 0;
 }
 
 function AllResults({ query, entry }: { query: string; entry: Entry }) {
@@ -376,7 +389,9 @@ function recentView(recent: RecentSearch): { title: string; subtitle: string; co
 
 function RecentSearches() {
   const recent = useLibrary((s) => s.recentSearches);
+  const canSearch = useAddons((s) => !s.loaded || hasResource(s.addons, "search"));
   const shown = recent.filter((r) => r.kind === "query" || r.payload);
+  if (!canSearch) return <NoSearchAddon />;
   if (shown.length === 0) {
     return (
       <div className="empty">

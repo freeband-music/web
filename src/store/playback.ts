@@ -6,7 +6,7 @@ import {
   type PlaybackUpdate,
   type TrackSnapshot,
 } from "../../shared/api";
-import { content, errorMessage, history, me } from "../api/client";
+import { ApiError, content, errorMessage, history, me } from "../api/client";
 import { Player, type PlayerState } from "../player/player";
 import * as q from "../queue/queue";
 import { toResolveResult, type PlayableStream } from "../resolver/resolver";
@@ -40,6 +40,8 @@ export type NowState =
   | { phase: "queued" }
   | { phase: "not_found" }
   | { phase: "no_addon" }
+  /** The server could not be reached; playing again retries. */
+  | { phase: "offline" }
   | { phase: "error"; message: string };
 
 interface PlaybackState {
@@ -153,10 +155,13 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     player.play(stream.url, startAt);
   }
 
-  /** Shows why the current item cannot play, then skips it after a moment. */
+  /**
+   * Shows why the current item cannot play, then skips it after a moment.
+   * Skipping would not help without a stream add-on or without the server.
+   */
   function fail(now: NowState) {
     set({ now });
-    if (now.phase === "no_addon") return;
+    if (now.phase === "no_addon" || now.phase === "offline") return;
     failedInARow += 1;
     if (failedInARow >= get().queue.items.length) return;
     const mine = generation;
@@ -220,7 +225,9 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     try {
       response = await content.stream({ track: trackSummary(item.track) });
     } catch (error) {
-      if (mine === generation) fail({ phase: "error", message: errorMessage(error) });
+      if (mine !== generation) return;
+      if (error instanceof ApiError && error.code === "network") fail({ phase: "offline" });
+      else fail({ phase: "error", message: errorMessage(error) });
       return;
     }
     if (mine !== generation) return;
@@ -231,7 +238,7 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
       streamIndex = 0;
       playStream(from);
     } else if (result.kind === "error") {
-      fail({ phase: "error", message: result.message });
+      fail({ phase: "error", message: `Stream add-on error: ${result.message}` });
     } else {
       fail({ phase: result.kind });
     }

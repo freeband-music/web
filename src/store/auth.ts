@@ -11,13 +11,15 @@ interface AuthState {
   config: AuthConfigResponse | null;
   /** The server could not be reached when the config was last asked for. */
   serverDown: boolean;
+  /** The session ended on the server while the app was open (not a sign-out here). */
+  sessionEnded: boolean;
   /** Asks the server whether this browser is signed in. */
   init(): Promise<void>;
   login(username: string, password: string): Promise<void>;
   signup(request: SignupRequest): Promise<void>;
   logout(): Promise<void>;
-  /** The session ended on the server (a request answered 401). */
-  signedOut(): void;
+  /** Drops the signed-in user; `expired` when the server ended the session (a request answered 401). */
+  signedOut(expired?: boolean): void;
   /** Updates the shown user after a profile change. */
   setUser(user: UserInfo): void;
 }
@@ -27,6 +29,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
   user: null,
   config: null,
   serverDown: false,
+  sessionEnded: false,
   async init() {
     try {
       const { user } = await auth.me();
@@ -38,11 +41,11 @@ export const useAuth = create<AuthState>()((set, get) => ({
   },
   async login(username, password) {
     const { user } = await auth.login({ username, password });
-    set({ status: "signedIn", user });
+    set({ status: "signedIn", user, sessionEnded: false });
   },
   async signup(request) {
     const { user } = await auth.signup(request);
-    set({ status: "signedIn", user });
+    set({ status: "signedIn", user, sessionEnded: false });
   },
   async logout() {
     try {
@@ -51,9 +54,9 @@ export const useAuth = create<AuthState>()((set, get) => ({
       get().signedOut();
     }
   },
-  signedOut() {
+  signedOut(expired = false) {
     if (get().status === "signedOut") return;
-    set({ status: "signedOut", user: null });
+    set({ status: "signedOut", user: null, sessionEnded: expired && get().status === "signedIn" });
     void loadConfig();
   },
   setUser: (user) => set({ user }),
@@ -67,4 +70,4 @@ async function loadConfig() {
   }
 }
 
-setUnauthorizedHandler(() => useAuth.getState().signedOut());
+setUnauthorizedHandler(() => useAuth.getState().signedOut(true));

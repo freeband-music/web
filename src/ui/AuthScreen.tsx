@@ -5,6 +5,7 @@ import { useAuth } from "../store/auth";
 export function AuthScreen() {
   const config = useAuth((s) => s.config);
   const serverDown = useAuth((s) => s.serverDown);
+  const sessionEnded = useAuth((s) => s.sessionEnded);
   const firstRun = config?.hasUsers === false;
   const canSignUp = firstRun || (config !== null && config.signup !== "closed");
   const needsInvite = !firstRun && config?.signup === "invite";
@@ -45,6 +46,7 @@ export function AuthScreen() {
             </button>
           </p>
         )}
+        {sessionEnded && !serverDown && <p className="status">You were signed out. Sign in again to continue.</p>}
         {firstRun && <p className="muted">Welcome. Create the first account; it becomes the administrator.</p>}
         <h2>{signingUp ? "Create an account" : "Sign in"}</h2>
         <label>

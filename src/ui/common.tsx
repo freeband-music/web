@@ -84,21 +84,32 @@ export function useAsync<T>(load: () => Promise<T>, key: string): Async<T> {
   return state.key === key ? state.value : { loading: true };
 }
 
+/** A small spinning ring for work in progress. */
+export function Spinner({ label }: { label?: string }) {
+  return <span className="spinner" role={label ? "status" : undefined} aria-label={label} />;
+}
+
 /** The visible state of the current track while it is not simply playing. */
 export function NowStatus({ now }: { now: NowState }) {
   switch (now.phase) {
     case "resolving":
-      return <span className="status">Finding a source…</span>;
+      return (
+        <span className="status busy">
+          <Spinner /> Finding a stream…
+        </span>
+      );
     case "queued":
-      return <span className="status">Not available yet. It has been requested; try again later.</span>;
+      return <span className="status">Getting this track ready — try again in a few minutes.</span>;
     case "not_found":
-      return <span className="status">No source found for this track.</span>;
+      return <span className="status">No stream found.</span>;
     case "no_addon":
       return (
         <span className="status">
           No stream add-on installed. <a href={links.addons}>Open Add-ons</a>
         </span>
       );
+    case "offline":
+      return <span className="status error">Can't reach the server. Press play to try again.</span>;
     case "error":
       return <span className="status error">{now.message}</span>;
     default:
