@@ -10,7 +10,7 @@ import { Modal, openMenu, toast, useIsPhone, type MenuItem } from "./overlays";
 import { ActionBar, formatTotal, PageHeader, SelectionBar, ToggleIcon } from "./page";
 import { playTracks } from "./play";
 import { deletePlaylistFlow } from "./playlistActions";
-import { moveKeys } from "./reorder";
+import { moveKeys } from "../queue/reorder";
 import { links } from "./router";
 import { openAddToPlaylist, TrackList } from "./tracks";
 

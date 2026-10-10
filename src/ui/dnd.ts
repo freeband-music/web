@@ -2,7 +2,7 @@
 // mouse, and pointer events on a drag handle (`data-drag-handle`) for touch.
 
 import { useRef, useState, type DragEvent, type HTMLAttributes, type PointerEvent } from "react";
-import { dropBefore } from "./reorder";
+import { dropBefore } from "../queue/reorder";
 
 interface DragState {
   moved: string[];

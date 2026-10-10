@@ -10,6 +10,7 @@ import { content, errorMessage, history, me } from "../api/client";
 import { Player, type PlayerState } from "../player/player";
 import * as q from "../queue/queue";
 import { toResolveResult, type PlayableStream } from "../resolver/resolver";
+import { moveKeys } from "../queue/reorder";
 import { albumSnapshot, trackSnapshot, trackSummary } from "../snapshots";
 import type { Album } from "../types";
 import { useSettings } from "./settings";
@@ -60,6 +61,9 @@ interface PlaybackState {
   jumpTo(index: number): void;
   remove(index: number): void;
   move(index: number, delta: -1 | 1): void;
+  /** Moves items (by key) to before `beforeKey`, or to the end when it is null. */
+  moveItems(keys: string[], beforeKey: string | null): void;
+  removeItems(keys: string[]): void;
   clear(): void;
 
   toggle(): void;
@@ -310,6 +314,21 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     },
     move(index, delta) {
       setQueue(q.move(get().queue, index, index + delta));
+    },
+    moveItems(keys, beforeKey) {
+      const queue = get().queue;
+      const index = new Map(queue.items.map((item, i) => [item.key, i]));
+      const order = moveKeys(queue.items.map((i) => i.key), keys, beforeKey);
+      setQueue(q.reorder(queue, order.map((key) => index.get(key)!)));
+    },
+    removeItems(keys) {
+      const before = get().queue;
+      const gone = new Set(keys);
+      const playingRemoved = gone.has(q.currentItem(before)?.key ?? "") && get().now.phase !== "idle";
+      let queue = before;
+      for (let i = before.items.length - 1; i >= 0; i--) if (gone.has(before.items[i].key)) queue = q.remove(queue, i);
+      if (playingRemoved) void startAt(queue);
+      else setQueue(queue);
     },
     clear() {
       set({ queue: q.emptyQueue(), shuffle: false });

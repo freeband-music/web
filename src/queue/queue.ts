@@ -33,6 +33,9 @@ function rearrange<T>(queue: Queue<T>, source: number[]): Queue<T> {
   return result;
 }
 
+/** Re-arranges items by old index (`source[i]` is the item now at `i`); the current item stays current. */
+export const reorder = <T>(queue: Queue<T>, source: number[]): Queue<T> => rearrange(queue, source);
+
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 
 /**

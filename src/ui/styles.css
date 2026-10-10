@@ -1480,17 +1480,15 @@ input[type="password"]:focus {
 .player {
   grid-area: player;
   display: grid;
-  grid-template:
-    "track controls extra" auto
-    "track seek extra" auto / minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1fr);
   align-items: center;
-  gap: 2px 16px;
+  gap: 16px;
+  min-height: 72px;
   padding: 8px 8px 12px;
   background: var(--panel);
 }
 
 .player-track {
-  grid-area: track;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1499,24 +1497,85 @@ input[type="password"]:focus {
 
 .player-track .cover {
   flex: none;
-  width: 52px;
+  width: 56px;
 }
 
-.player-controls {
-  grid-area: controls;
+.player-text .track-title {
+  font-size: 14px;
+}
+
+.player-text > .muted {
+  font-size: 12px;
+}
+
+.player-center {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
   justify-content: center;
   gap: 8px;
 }
 
-.player-seek {
-  grid-area: seek;
+.transport .icon-button.primary {
+  width: 32px;
+  height: 32px;
+}
+
+.transport .icon-button.primary .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* An on toggle (shuffle, repeat, queue) gets a dot under it; repeat one also a "1". */
+.icon-button.toggle {
+  position: relative;
+}
+
+.icon-button.toggle.active::after {
+  content: "";
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin-left: -2px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.icon-button.repeat-one::before {
+  content: "1";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.seek {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  max-width: 640px;
 }
 
-.player-seek input {
+.seek .range {
   flex: 1;
 }
 
@@ -1528,8 +1587,57 @@ input[type="password"]:focus {
   text-align: center;
 }
 
+.range {
+  height: 4px;
+  margin: 6px 0;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--text) var(--p, 0%), #4d4d4d var(--p, 0%));
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.range:hover:not(:disabled),
+.range:focus-visible {
+  background: linear-gradient(to right, var(--accent) var(--p, 0%), #4d4d4d var(--p, 0%));
+  outline: none;
+}
+
+.range:disabled {
+  cursor: default;
+}
+
+.range::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0;
+  -webkit-appearance: none;
+}
+
+.range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0;
+}
+
+.range:hover:not(:disabled)::-webkit-slider-thumb,
+.range:focus-visible::-webkit-slider-thumb,
+.range:active::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+.range:hover:not(:disabled)::-moz-range-thumb,
+.range:focus-visible::-moz-range-thumb {
+  opacity: 1;
+}
+
 .player-extra {
-  grid-area: extra;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -1537,8 +1645,182 @@ input[type="password"]:focus {
   min-width: 0;
 }
 
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .volume {
-  width: 110px;
+  width: 100px;
+}
+
+/* Full-screen Now Playing (phones) */
+.now-playing {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: calc(8px + env(safe-area-inset-top)) 24px calc(16px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: linear-gradient(var(--hero), var(--bg) 70%);
+  animation: now-in 0.22s ease-out;
+}
+
+@keyframes now-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+.now-swipe {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  touch-action: pan-x;
+}
+
+.now-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -8px;
+}
+
+.now-head .icon-button {
+  color: var(--text);
+}
+
+.now-from {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  font-size: 12px;
+  text-align: center;
+}
+
+.now-from strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.now-cover {
+  width: min(100%, 52dvh);
+  margin: 16px auto 8px;
+}
+
+.now-cover .cover {
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.now-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.now-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.now-title {
+  overflow: hidden;
+  font-size: 22px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now-text > .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now-info .icon-button .icon {
+  width: 26px;
+  height: 26px;
+}
+
+.now-playing .seek {
+  max-width: none;
+}
+
+.now-playing .range {
+  height: 5px;
+}
+
+.now-playing .range::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+.now-playing .range::-moz-range-thumb {
+  opacity: 1;
+}
+
+.transport.large {
+  justify-content: space-between;
+}
+
+.transport.large .icon-button.primary {
+  width: 64px;
+  height: 64px;
+}
+
+.transport.large .icon-button.primary .icon {
+  width: 30px;
+  height: 30px;
+}
+
+.transport.large .icon-button {
+  color: var(--text);
+}
+
+.transport.large .icon-button.active {
+  color: var(--accent);
+}
+
+.transport.large .icon-button.primary {
+  color: #000;
+}
+
+.now-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.now-foot .volume {
+  width: 140px;
+}
+
+/* Queue */
+.title-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.queue-heading {
+  margin: 24px 0 8px;
+  font-size: 18px;
+}
+
+.tracklist.earlier .trow-title {
+  color: var(--muted);
 }
 
 .badge {

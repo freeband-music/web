@@ -13,11 +13,12 @@ import { Icon, type IconName } from "./icons";
 import { LibraryScreen } from "./LibraryScreen";
 import { LikedScreen } from "./LikedScreen";
 import { openMenu, Overlays, type MenuItem } from "./overlays";
+import { NowPlaying, openNowPlaying } from "./NowPlaying";
 import { PlayerBar } from "./PlayerBar";
 import { createPlaylistFlow } from "./playlistActions";
 import { PlaylistScreen } from "./PlaylistScreen";
 import { QueueScreen } from "./QueueScreen";
-import { links, navigate, useRoute, type Route } from "./router";
+import { links, useRoute, type Route } from "./router";
 import { SearchInput, SearchScreen } from "./SearchScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { useKeyboardShortcuts } from "./shortcuts";
@@ -173,11 +174,6 @@ function TopBar({ route }: { route: Route }) {
   );
 }
 
-/** Where tapping the mini player goes; the full-screen Now Playing view replaces this. */
-export function openNowPlaying(): void {
-  navigate(links.queue);
-}
-
 function MiniPlayer() {
   const item = usePlayback((s) => currentItem(s.queue));
   const busy = usePlayback((s) => s.player.status === "playing" || s.player.status === "loading");
@@ -229,6 +225,7 @@ function Shell() {
         <MiniPlayer />
         <TabBar route={route} />
       </div>
+      <NowPlaying />
       <Overlays />
     </div>
   );
