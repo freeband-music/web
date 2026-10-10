@@ -516,3 +516,17 @@ export interface PlaybackResponse {
 export interface PlaybackSavedResponse {
   updatedAt: string;
 }
+
+// Playlist search and profiles.
+
+/** `GET search/playlists?q=`: the user's own playlists and others' public ones, by name or description. */
+export interface PlaylistSearchResponse {
+  playlists: PlaylistSummary[];
+}
+
+/** `GET users/:username`. */
+export interface ProfileResponse {
+  user: PublicUser;
+  /** The user's public playlists, most recently updated first. */
+  playlists: PlaylistSummary[];
+}

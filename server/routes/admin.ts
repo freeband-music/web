@@ -59,6 +59,11 @@ export default async function adminRoutes(app: FastifyInstance): Promise<void> {
     return { signup: body.signup };
   });
 
+  app.post("/admin/cache/clear", async (_req, reply) => {
+    await app.ctx.cache.clear();
+    return reply.status(204).send();
+  });
+
   app.get("/admin/invites", async (): Promise<InvitesResponse> => {
     const invites = await db.selectFrom("invites").selectAll().orderBy("created_at", "desc").execute();
     return { invites: invites.map(toInviteInfo) };
