@@ -43,7 +43,7 @@ test("stats count plays, minutes, top tracks and main artists within the range",
   expect(recent.topArtists.map((a) => [a.artist.name, a.plays])).toEqual([["A", 2], ["B", 2]]);
 
   const all = await listeningStats(db, "u", "all", now);
-  expect(all.topTracks[0]).toMatchObject({ track: { id: "t1" }, plays: 2 });
+  expect(all.topTracks.map((t) => [t.track.id, t.plays])).toEqual([["t2", 2], ["t1", 2], ["t3", 1]]);
   expect(all.since).toBeNull();
   await db.destroy();
 });
