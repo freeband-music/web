@@ -21,6 +21,11 @@ export interface Config {
   /** Cache lifetimes in seconds. */
   ttl: CacheTtls;
   prefetch: PrefetchConfig;
+  /**
+   * Whether stream add-ons may be asked to start a download when nothing is
+   * playable yet. Users must also turn it on; see `downloadsPermitted`.
+   */
+  allowDownloads: boolean;
 }
 
 export interface CacheTtls {
@@ -135,5 +140,6 @@ export function loadConfig(env: Env = process.env, warn: (msg: string) => void =
       limit: intEnv(env, "FREEBAND_PREFETCH_LIMIT", DEFAULT_PREFETCH.limit, 0),
       queueAhead: intEnv(env, "FREEBAND_PREFETCH_QUEUE_AHEAD", DEFAULT_PREFETCH.queueAhead, 0),
     },
+    allowDownloads: boolEnv(env.FREEBAND_ALLOW_DOWNLOADS, false),
   };
 }

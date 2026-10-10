@@ -19,6 +19,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     production: false,
     ttl: DEFAULT_TTLS,
     prefetch: DEFAULT_PREFETCH,
+    allowDownloads: false,
     ...overrides,
   };
 }

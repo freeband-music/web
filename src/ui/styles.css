@@ -1514,6 +1514,15 @@ input[type="password"]:focus {
   accent-color: var(--accent);
 }
 
+.options label.disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.options label.disabled:hover {
+  background: none;
+}
+
 
 /* Player bar */
 .player {

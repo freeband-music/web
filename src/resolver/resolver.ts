@@ -8,7 +8,7 @@ export type PlayableStream = Stream;
 export type ResolveResult =
   | { kind: "ok"; streams: PlayableStream[] }
   | { kind: "queued"; message?: string }
-  | { kind: "not_found" }
+  | { kind: "not_found"; message?: string }
   | { kind: "no_addon" }
   | { kind: "error"; message: string };
 

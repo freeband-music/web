@@ -1,4 +1,5 @@
 import type { QualityPreset } from "../resolver/resolver";
+import { useAuth } from "../store/auth";
 import { useSettings } from "../store/settings";
 
 const QUALITY: { value: QualityPreset; label: string; hint: string }[] = [
@@ -9,7 +10,8 @@ const QUALITY: { value: QualityPreset; label: string; hint: string }[] = [
 ];
 
 export function SettingsScreen() {
-  const { quality, setQuality } = useSettings();
+  const { quality, setQuality, allowDownloads, setAllowDownloads } = useSettings();
+  const serverAllowsDownloads = useAuth((s) => s.config?.allowDownloads === true);
   return (
     <div className="screen">
       <h1>Settings</h1>
@@ -31,6 +33,26 @@ export function SettingsScreen() {
         ))}
       </fieldset>
       <p className="muted">A better-matching source always comes before a higher-quality one.</p>
+      <fieldset className="options">
+        <legend>Playback</legend>
+        <label className={serverAllowsDownloads ? undefined : "disabled"}>
+          <input
+            type="checkbox"
+            disabled={!serverAllowsDownloads}
+            checked={serverAllowsDownloads && allowDownloads}
+            onChange={(event) => setAllowDownloads(event.target.checked)}
+          />
+          <span>
+            Download tracks that aren't ready yet
+            <span className="muted">
+              {" · "}
+              {serverAllowsDownloads
+                ? "A stream add-on may start a download; the track plays once it is ready."
+                : "Not available yet"}
+            </span>
+          </span>
+        </label>
+      </fieldset>
     </div>
   );
 }

@@ -41,7 +41,7 @@ afterAll(() => {
 test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch through the API", async () => {
   const requested: string[] = [];
   const app = await testApp(
-    { prefetch: { concurrency: 2, limit: 50, queueAhead: 1 } },
+    {},
     {
       fetch: (input, init) => {
         requested.push(input);
@@ -71,7 +71,7 @@ test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch th
   expect((await call("GET", "/api/meta/album/fake:album:1")).json().tracks).toHaveLength(2);
   expect((await call("GET", "/api/meta/album/fake:album:9")).statusCode).toBe(404);
 
-  // Prefetch the rest of the queue: the next track may queue a download, later ones are asked with queue=false.
+  // Downloads are off by default: prefetch and playback only ever ask with queue=false.
   const track3 = {
     id: "fake:track:3",
     title: "Prepared on request",
@@ -85,14 +85,10 @@ test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch th
   for (let i = 0; i < 50 && streamRequests("fake:track:3").length === 0; i++) {
     await new Promise((r) => setTimeout(r, 50));
   }
-  expect(streamRequests("fake:track:2").every((u) => !u.includes("queue=false"))).toBe(true);
   expect(streamRequests("fake:track:3").length).toBeGreaterThan(0);
-  expect(streamRequests("fake:track:3").every((u) => u.includes("queue=false"))).toBe(true);
 
-  // Without queueing the add-on has nothing ready; that answer does not block a request that may queue.
-  const quiet = (await call("POST", "/api/stream", { track: track3, allowQueue: false })).json();
-  expect(quiet.result.kind).toBe("not_found");
-  expect((await call("POST", "/api/stream", { track: track3 })).json().result.kind).toBe("queued");
+  // The add-on has nothing ready for track 3, and a request cannot make it queue a download.
+  expect((await call("POST", "/api/stream", { track: track3, allowQueue: true })).json().result.kind).toBe("not_found");
 
   for (let i = 0; i < 50; i++) {
     if ((await call("POST", "/api/stream", { track: track2, allowQueue: false })).json().cached) break;
@@ -103,6 +99,9 @@ test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch th
   expect(first.result.streams[0].match.kind).toBe("exact");
   expect(first.cached).toBe(false);
   expect((await call("POST", "/api/stream", { track: track1 })).json().cached).toBe(true);
+  const allStreamRequests = requested.filter((u) => u.includes("/stream/track/"));
+  expect(allStreamRequests.length).toBeGreaterThan(0);
+  expect(allStreamRequests.every((u) => u.includes("queue=false"))).toBe(true);
 
   const list = (await call("GET", "/api/addons")).json();
   expect(JSON.stringify(list)).not.toContain("url_encrypted");

@@ -38,7 +38,7 @@ export type NowState =
   | { phase: "resolving" }
   | { phase: "playing"; stream: PlayableStream }
   | { phase: "queued" }
-  | { phase: "not_found" }
+  | { phase: "not_found"; message?: string }
   | { phase: "no_addon" }
   /** The server could not be reached; playing again retries. */
   | { phase: "offline" }
@@ -239,6 +239,8 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
       playStream(from);
     } else if (result.kind === "error") {
       fail({ phase: "error", message: `Stream add-on error: ${result.message}` });
+    } else if (result.kind === "not_found") {
+      fail({ phase: "not_found", message: result.message });
     } else {
       fail({ phase: result.kind });
     }

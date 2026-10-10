@@ -56,6 +56,8 @@ export interface MeResponse {
 export interface AuthConfigResponse {
   signup: SignupMode;
   hasUsers: boolean;
+  /** The server lets users allow downloads (`allowDownloads` in their settings). */
+  allowDownloads: boolean;
 }
 
 export interface ChangePasswordRequest {
@@ -188,8 +190,9 @@ export interface AddonSearchResponse {
 export interface StreamResolveRequest {
   track: TrackSummary;
   /**
-   * Whether a stream add-on may be asked, which can make it queue a download
-   * (default true). With false only cached results are returned.
+   * Whether a stream add-on may queue a download (default true). It is ignored
+   * unless the server and the user both allow downloads; otherwise add-ons are
+   * asked only for what is playable now.
    */
   allowQueue?: boolean;
 }
@@ -198,7 +201,7 @@ export interface StreamResolveRequest {
 export type StreamResult =
   | { kind: "ok"; streams: Stream[] }
   | { kind: "queued"; message?: string }
-  | { kind: "not_found" }
+  | { kind: "not_found"; message?: string }
   /** `allowQueue: false` and nothing cached yet. */
   | { kind: "not_cached" }
   | { kind: "no_addon" }

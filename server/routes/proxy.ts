@@ -2,9 +2,11 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { AddonSearchResponse, PrefetchResponse, StreamResolveResponse, TrackSummary } from "../../shared/api";
 import { trackSummarySchema } from "../addons/schemas";
+import { withoutDownloads } from "../addons/service";
 import { loadActiveAddons } from "../addons/store";
 import { currentUser, requireUser } from "../auth/guard";
 import { parse } from "../http";
+import { userDownloadsPermitted } from "../settings";
 
 const MAX_QUEUE = 1000;
 
@@ -43,13 +45,17 @@ export default async function proxyRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/stream", async (req): Promise<StreamResolveResponse> => {
     const body = parse(streamBody, req.body);
-    return service.streams(await active(req), body.track as TrackSummary, body.allowQueue ?? true);
+    // The request can only narrow what the server and the user allow.
+    const downloads = await userDownloadsPermitted(app.ctx, currentUser(req).id);
+    const response = await service.streams(await active(req), body.track as TrackSummary, downloads && (body.allowQueue ?? true));
+    return downloads ? response : withoutDownloads(response);
   });
 
   app.post("/prefetch", async (req, reply) => {
     const body = parse(prefetchBody, req.body);
     const upcoming = body.tracks.slice((body.current ?? -1) + 1) as TrackSummary[];
-    const planned = await prefetch.streams(currentUser(req).id, await active(req), upcoming);
+    const userId = currentUser(req).id;
+    const planned = await prefetch.streams(userId, await active(req), upcoming, await userDownloadsPermitted(app.ctx, userId));
     return reply.status(202).send({ planned } satisfies PrefetchResponse);
   });
 

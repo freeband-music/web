@@ -24,7 +24,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/auth/config", async (): Promise<AuthConfigResponse> => {
     const any = await db.selectFrom("users").select("id").limit(1).executeTakeFirst();
-    return { signup: await getSignupMode(app.ctx), hasUsers: any !== undefined };
+    return { signup: await getSignupMode(app.ctx), hasUsers: any !== undefined, allowDownloads: app.ctx.config.allowDownloads };
   });
 
   app.post("/auth/signup", async (req, reply): Promise<MeResponse> => {

@@ -101,7 +101,7 @@ export function NowStatus({ now }: { now: NowState }) {
     case "queued":
       return <span className="status">Getting this track ready — try again in a few minutes.</span>;
     case "not_found":
-      return <span className="status">No stream found.</span>;
+      return <span className="status">{now.message ?? "Not available right now."}</span>;
     case "no_addon":
       return (
         <span className="status">

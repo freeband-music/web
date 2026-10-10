@@ -74,8 +74,11 @@ export class PrefetchManager {
     });
   }
 
-  /** Plans and starts the stream prefetch; resolves with the number of lookups started. */
-  async streams(userId: string, addons: ActiveAddon[], tracks: TrackSummary[]): Promise<number> {
+  /**
+   * Plans and starts the stream prefetch; resolves with the number of lookups
+   * started. Without `allowDownloads` no lookup may queue a download.
+   */
+  async streams(userId: string, addons: ActiveAddon[], tracks: TrackSummary[], allowDownloads: boolean): Promise<number> {
     const jobKey = `stream:${userId}`;
     const controller = this.begin(jobKey);
     const window = tracks.slice(0, this.config.limit);
@@ -87,7 +90,10 @@ export class PrefetchManager {
       })),
     );
     if (controller.signal.aborted) return 0;
-    const steps = planPrefetch(candidates, this.config);
+    const steps = planPrefetch(candidates, {
+      limit: this.config.limit,
+      queueAhead: allowDownloads ? this.config.queueAhead : 0,
+    });
     const run = pool(steps, this.config.concurrency, controller.signal, async (step) => {
       const track = window[step.index];
       if (step.allowQueue) return this.service.streams(addons, track, true);

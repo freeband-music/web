@@ -51,6 +51,18 @@ interface StreamEntry {
   queueAllowed: boolean;
 }
 
+/** Why a track cannot play when downloads are off and only an add-on without `queue=false` serves it. */
+export const TOO_OLD_FOR_NO_QUEUE = "This stream add-on is too old to play cached sources only.";
+
+/**
+ * A request that may not queue a download: what older add-ons could not be
+ * asked for becomes "not found", with the reason.
+ */
+export function withoutDownloads(response: StreamResolveResponse): StreamResolveResponse {
+  if (response.result.kind !== "not_cached") return response;
+  return { ...response, result: { kind: "not_found", message: TOO_OLD_FOR_NO_QUEUE } };
+}
+
 /** True when the add-on understands `queue=false` on stream requests (protocol 0.3.0 and later). */
 export function supportsNoQueue(manifest: Manifest): boolean {
   const [major, minor] = manifest.protocolVersion.split(".").map((part) => Number.parseInt(part, 10));
