@@ -4,13 +4,18 @@ import cookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyInstance } from "fastify";
 import { CSRF_HEADER, CSRF_VALUE } from "../shared/api";
+import { defaultFetch } from "./addons/http";
+import { PrefetchManager } from "./addons/prefetch";
+import { AddonService } from "./addons/service";
 import { RateLimiter } from "./auth/rate-limit";
+import { Cache, DbCacheStore } from "./cache/cache";
 import type { Config } from "./config";
 import type { AppContext, Deps } from "./context";
 import { errorBody, installErrorHandler } from "./http";
 import { routeModules } from "./routes/index";
 
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const PURGE_INTERVAL_MS = 10 * 60 * 1000;
 
 export interface BuildOptions {
   logger?: boolean;
@@ -18,13 +23,28 @@ export interface BuildOptions {
 
 export async function buildApp(config: Config, deps: Deps, options: BuildOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false, trustProxy: config.trustProxy });
+  const now = deps.now ?? (() => new Date());
+  const cache = new Cache(new DbCacheStore(deps.db), now);
+  const addons = new AddonService(cache, config.ttl, deps.fetch ?? defaultFetch);
   const ctx: AppContext = {
     config,
     db: deps.db,
-    now: deps.now ?? (() => new Date()),
+    now,
     loginLimiter: new RateLimiter(5, 15 * 60 * 1000),
+    cache,
+    addons,
+    prefetch: new PrefetchManager(addons, config.prefetch),
   };
   app.decorate("ctx", ctx);
+
+  const purge = setInterval(() => {
+    cache.purge().catch((err) => app.log.error(err, "cache purge failed"));
+  }, PURGE_INTERVAL_MS);
+  purge.unref();
+  app.addHook("onClose", async () => {
+    clearInterval(purge);
+    ctx.prefetch.stopAll();
+  });
   app.decorateRequest("auth", null);
   installErrorHandler(app);
   await app.register(cookie);
