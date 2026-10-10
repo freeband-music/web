@@ -9,7 +9,24 @@ test("migrations run up to latest and back down to nothing", async () => {
     (await db.introspection.getTables()).map((t) => t.name).filter((n) => !n.startsWith("kysely_")).sort();
 
   await migrateToLatest(db);
-  expect(await tables()).toEqual(["cache_entries", "invites", "server_settings", "sessions", "user_addons", "users"]);
+  expect(await tables()).toEqual([
+    "cache_entries",
+    "followed_artists",
+    "invites",
+    "likes",
+    "playback_state",
+    "playlist_follows",
+    "playlist_tracks",
+    "playlists",
+    "plays",
+    "recent_searches",
+    "saved_albums",
+    "server_settings",
+    "sessions",
+    "user_addons",
+    "user_settings",
+    "users",
+  ]);
 
   checkResult(await createMigrator(db).migrateTo(NO_MIGRATIONS));
   expect(await tables()).toEqual([]);

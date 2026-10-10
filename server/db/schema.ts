@@ -64,6 +64,99 @@ export interface CacheEntriesTable {
   created_at: string;
 }
 
+export type PlaylistVisibility = "private" | "public";
+
+export interface PlaylistsTable {
+  id: string;
+  owner_id: string;
+  name: string;
+  description: Generated<string>;
+  visibility: PlaylistVisibility;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Tracks of a playlist; `position` is 0-based and dense (renumbered on every change). */
+export interface PlaylistTracksTable {
+  id: string;
+  playlist_id: string;
+  position: number;
+  track_id: string;
+  album_id: string | null;
+  album_cover: string | null;
+  duration_ms: number | null;
+  /** The TrackSnapshot as JSON. */
+  snapshot_json: string;
+  added_at: string;
+  added_by: string | null;
+}
+
+export interface PlaylistFollowsTable {
+  user_id: string;
+  playlist_id: string;
+  created_at: string;
+}
+
+export interface LikesTable {
+  user_id: string;
+  track_id: string;
+  snapshot_json: string;
+  created_at: string;
+}
+
+export interface SavedAlbumsTable {
+  user_id: string;
+  album_id: string;
+  snapshot_json: string;
+  created_at: string;
+}
+
+export interface FollowedArtistsTable {
+  user_id: string;
+  artist_id: string;
+  snapshot_json: string;
+  created_at: string;
+}
+
+export type PlayContextType = "album" | "playlist" | "artist" | "search" | "queue";
+
+export interface PlaysTable {
+  id: string;
+  user_id: string;
+  track_id: string;
+  /** The track's main (first) artist; top artists count it only. */
+  artist_id: string;
+  artist_name: string;
+  album_id: string | null;
+  snapshot_json: string;
+  played_at: string;
+  ms_played: number;
+  context_type: PlayContextType;
+  context_id: string | null;
+  context_name: string | null;
+  context_image: string | null;
+}
+
+export interface RecentSearchesTable {
+  user_id: string;
+  kind: "query" | "track" | "album" | "artist" | "playlist";
+  key: string;
+  payload_json: string;
+  created_at: string;
+}
+
+export interface UserSettingsTable {
+  user_id: string;
+  settings_json: string;
+  updated_at: string;
+}
+
+export interface PlaybackStateTable {
+  user_id: string;
+  state_json: string;
+  updated_at: string;
+}
+
 export interface Database {
   users: UsersTable;
   sessions: SessionsTable;
@@ -71,6 +164,16 @@ export interface Database {
   server_settings: ServerSettingsTable;
   user_addons: UserAddonsTable;
   cache_entries: CacheEntriesTable;
+  playlists: PlaylistsTable;
+  playlist_tracks: PlaylistTracksTable;
+  playlist_follows: PlaylistFollowsTable;
+  likes: LikesTable;
+  saved_albums: SavedAlbumsTable;
+  followed_artists: FollowedArtistsTable;
+  plays: PlaysTable;
+  recent_searches: RecentSearchesTable;
+  user_settings: UserSettingsTable;
+  playback_state: PlaybackStateTable;
 }
 
 export type User = Selectable<UsersTable>;
@@ -79,3 +182,5 @@ export type UserUpdate = Updateable<UsersTable>;
 export type Session = Selectable<SessionsTable>;
 export type Invite = Selectable<InvitesTable>;
 export type UserAddon = Selectable<UserAddonsTable>;
+export type Playlist = Selectable<PlaylistsTable>;
+export type PlaylistTrack = Selectable<PlaylistTracksTable>;

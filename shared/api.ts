@@ -215,3 +215,101 @@ export interface PrefetchResponse {
   /** Lookups started (cached items are skipped). */
   planned: number;
 }
+
+// Library. Tracks, albums and artists are stored as snapshots: enough to
+// show them and to request streams without asking their metadata add-on.
+
+/** A track as stored in playlists, likes, history and the synced queue. */
+export type TrackSnapshot = TrackSummary & {
+  /** Base URL of the metadata add-on the track came from, when known. */
+  addonBaseUrl?: string;
+};
+
+/** An album as stored in the library (the protocol's album summary). */
+export type AlbumSnapshot = AlbumSummary & { addonBaseUrl?: string };
+
+/** An artist as stored in the library (the protocol's artist summary). */
+export type ArtistSnapshot = ArtistSummary & { addonBaseUrl?: string };
+
+export type PlaylistVisibility = "private" | "public";
+
+/** A user as others see them. */
+export interface PublicUser {
+  username: string;
+  displayName: string;
+}
+
+export interface PlaylistSummary {
+  id: string;
+  name: string;
+  description: string;
+  visibility: PlaylistVisibility;
+  owner: PublicUser;
+  /** The signed-in user owns this playlist. */
+  isOwner: boolean;
+  /** The signed-in user follows this playlist. */
+  followed: boolean;
+  trackCount: number;
+  /** Sum of the known track durations. */
+  durationMs: number;
+  /** Up to 4 distinct album covers, in playlist order, for a mosaic. */
+  covers: string[];
+  createdAt: string;
+  updatedAt: string;
+  /** When the signed-in user followed it (followed playlists only). */
+  followedAt?: string;
+}
+
+/** One track in a playlist. The same track may appear several times, each with its own entry ID. */
+export interface PlaylistEntry {
+  entryId: string;
+  track: TrackSnapshot;
+  addedAt: string;
+}
+
+/** `GET playlists`: the user's own playlists, then followed ones. */
+export interface PlaylistsResponse {
+  playlists: PlaylistSummary[];
+}
+
+/** `GET playlists/:id`, and the answer to every playlist change. */
+export interface PlaylistResponse {
+  playlist: PlaylistSummary;
+  tracks: PlaylistEntry[];
+}
+
+export interface CreatePlaylistRequest {
+  name: string;
+  description?: string;
+  /** Default "private". */
+  visibility?: PlaylistVisibility;
+  /** Initial tracks, for example "save queue as playlist". */
+  tracks?: TrackSnapshot[];
+}
+
+export interface UpdatePlaylistRequest {
+  name?: string;
+  description?: string;
+  visibility?: PlaylistVisibility;
+}
+
+/** `POST playlists/:id/tracks`. Duplicates are allowed. */
+export interface AddPlaylistTracksRequest {
+  tracks: TrackSnapshot[];
+  /** 0-based index to insert at; default the end. */
+  position?: number;
+}
+
+/** `DELETE playlists/:id/tracks`. */
+export interface RemovePlaylistTracksRequest {
+  entryIds: string[];
+}
+
+/**
+ * `POST playlists/:id/tracks/move`: moves the entries, keeping their
+ * relative order, to just before `beforeEntryId` (null: to the end).
+ */
+export interface MovePlaylistTracksRequest {
+  entryIds: string[];
+  beforeEntryId: string | null;
+}
