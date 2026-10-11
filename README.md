@@ -95,24 +95,25 @@ The image runs as a non-root user and keeps its SQLite database in the
 | `FREEBAND_PREFETCH_CONCURRENCY` | `2` | Stream lookups running at once per user |
 | `FREEBAND_PREFETCH_LIMIT` | `50` | Most upcoming tracks one prefetch covers |
 | `FREEBAND_PREFETCH_QUEUE_AHEAD` | `3` | Upcoming tracks for which a stream add-on may start a download (only with downloads allowed) |
-| `FREEBAND_ALLOW_DOWNLOADS` | `false` | Let users allow stream add-ons to start downloads (see below) |
+| `FREEBAND_ALLOW_DOWNLOADS` | `true` | Let users allow stream add-ons to start downloads (see below); `false` turns the setting off for everyone |
 | `FREEBAND_PROTOCOL` | `../protocol` | Protocol repository, for `just gen` only |
 
 Durations take a number of seconds or a suffix: `90s`, `15m`, `6h`, `7d`.
 
 ### Downloads
 
-By default Freeband plays only sources that are playable right away. Every
+Unless a user turns downloads on, Freeband plays only sources that are playable right away. Every
 stream request is sent with `queue=false`, so a stream add-on never starts a
 download; a track with nothing playable shows "Not available right now" and is
 skipped. Stream add-ons on protocol versions before 0.3.0 do not understand
 `queue=false` and might start a download on any request, so they are not asked
 at all: only an answer already in the cache is used.
 
-Downloads are allowed only when the server sets `FREEBAND_ALLOW_DOWNLOADS=true`
-and the user turns on "Download tracks that aren't ready yet" in Settings (the
-setting is greyed out otherwise). A client request can never allow more than
-that.
+Downloads are allowed only when the user turns on "Download tracks that
+aren't ready yet" in Settings (off by default) and the server allows it
+(`FREEBAND_ALLOW_DOWNLOADS`, on by default; with `false` the setting is greyed
+out). A client request can never allow more than that. The server itself never
+downloads media; a stream add-on decides where the download happens.
 
 Prefetch looks up streams for the whole upcoming queue, up to
 `FREEBAND_PREFETCH_LIMIT` tracks, always with `queue=false`. With downloads

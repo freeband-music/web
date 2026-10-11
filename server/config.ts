@@ -140,6 +140,6 @@ export function loadConfig(env: Env = process.env, warn: (msg: string) => void =
       limit: intEnv(env, "FREEBAND_PREFETCH_LIMIT", DEFAULT_PREFETCH.limit, 0),
       queueAhead: intEnv(env, "FREEBAND_PREFETCH_QUEUE_AHEAD", DEFAULT_PREFETCH.queueAhead, 0),
     },
-    allowDownloads: boolEnv(env.FREEBAND_ALLOW_DOWNLOADS, false),
+    allowDownloads: boolEnv(env.FREEBAND_ALLOW_DOWNLOADS, true),
   };
 }

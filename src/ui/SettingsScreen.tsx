@@ -48,7 +48,7 @@ export function SettingsScreen() {
               {" · "}
               {serverAllowsDownloads
                 ? "A stream add-on may start a download; the track plays once it is ready."
-                : "Not available yet"}
+                : "Turned off on this server"}
             </span>
           </span>
         </label>
