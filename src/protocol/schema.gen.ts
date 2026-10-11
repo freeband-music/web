@@ -131,6 +131,8 @@ export interface components {
             name: string;
             /** Format: uri */
             image?: string;
+            /** @description Optional, 0 (unknown to listeners) to 100 (among the most played). */
+            popularity?: number;
         };
         AlbumSummary: {
             id: string;
@@ -141,6 +143,8 @@ export interface components {
             trackCount?: number;
             /** Format: uri */
             cover?: string;
+            /** @description Optional, 0 (unknown to listeners) to 100 (among the most played). */
+            popularity?: number;
         };
         TrackSummary: {
             id: string;
@@ -153,6 +157,8 @@ export interface components {
             durationMs?: number;
             /** @description International Standard Recording Code, when known. */
             isrc?: string;
+            /** @description Optional, 0 (unknown to listeners) to 100 (among the most played). */
+            popularity?: number;
         };
         Artist: components["schemas"]["ArtistSummary"] & {
             albums: components["schemas"]["AlbumSummary"][];

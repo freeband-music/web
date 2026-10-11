@@ -103,18 +103,31 @@ export function idSegment(id: string): string {
   return encodeURIComponent(id).replace(/%3A/gi, ":");
 }
 
-function mergeById<T extends { id: string }>(lists: unknown[]): T[] {
+/**
+ * Merges the lists of several add-ons, dropping repeated IDs. Each add-on's
+ * order is kept; at each step the more popular of the add-ons' next items goes
+ * first (no popularity counts as least; on a tie the earlier add-on wins).
+ */
+export function mergeById<T extends { id: string; popularity?: number }>(lists: unknown[]): T[] {
+  const queues = lists.filter(Array.isArray).map((list) =>
+    (list as T[]).filter((item) => item && typeof item.id === "string"),
+  );
+  const heads = queues.map(() => 0);
   const seen = new Set<string>();
   const merged: T[] = [];
-  for (const list of lists) {
-    if (!Array.isArray(list)) continue;
-    for (const item of list as T[]) {
-      if (!item || typeof item.id !== "string" || seen.has(item.id)) continue;
-      seen.add(item.id);
-      merged.push(item);
+  const score = (item: T) => (typeof item.popularity === "number" ? item.popularity : -1);
+  for (;;) {
+    let best = -1;
+    for (let i = 0; i < queues.length; i++) {
+      while (heads[i] < queues[i].length && seen.has(queues[i][heads[i]].id)) heads[i]++;
+      if (heads[i] >= queues[i].length) continue;
+      if (best < 0 || score(queues[i][heads[i]]) > score(queues[best][heads[best]])) best = i;
     }
+    if (best < 0) return merged;
+    const item = queues[best][heads[best]++];
+    seen.add(item.id);
+    merged.push(item);
   }
-  return merged;
 }
 
 function message(reason: unknown): string {

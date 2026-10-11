@@ -8,13 +8,13 @@ import { usePlayback } from "../store/playback";
 import { albumSnapshot, artistSnapshot, trackSnapshot } from "../snapshots";
 import type { AlbumSummary, ArtistSummary, TrackSummary } from "../types";
 import { Card, CardGrid, CardRow, Chips, PlayFab } from "./cards";
-import { artistNames, Cover, IconButton, Mosaic } from "./common";
+import { artistNames, Cover, IconButton, Mosaic, useAsync } from "./common";
 import { Icon } from "./icons";
 import { useIsPhone } from "./overlays";
 import { playAlbumById, playArtistById, playPlaylistById } from "./play";
 import { links, navigate, type SearchTab } from "./router";
 import { SEARCH_INPUT_ATTR } from "./shortcuts";
-import { pickTopResult } from "./topResult";
+import { pickTopResult, songsFollowing, type TopResult } from "./topResult";
 import { TrackList, type TrackListRow } from "./tracks";
 
 const DEBOUNCE_MS = 350;
@@ -173,8 +173,16 @@ const PlaylistCard = ({ playlist }: { playlist: PlaylistSummary }) => (
   />
 );
 
-function TopResultCard({ query, entry }: { query: string; entry: Entry }) {
-  const top = entry.result && pickTopResult(query, entry.result.results, entry.playlists);
+/** The tracks of the top result's album, for "Songs" to list first. */
+function useTopAlbumTracks(top: TopResult | null): TrackSummary[] {
+  const albumId = top?.kind === "album" ? top.album.id : "";
+  const album = useAsync(async () => (albumId ? content.album(albumId) : null), `top-album-${albumId}`);
+  if (album.loading || "error" in album || !album.data) return [];
+  const { tracks, ...summary } = album.data;
+  return tracks.map((t) => ({ ...t, album: t.album ?? summary }));
+}
+
+function TopResultCard({ top }: { top: TopResult | null }) {
   if (!top) return null;
   let href: string;
   let cover;
@@ -276,11 +284,14 @@ function isEmpty(entry: Entry) {
 
 function AllResults({ query, entry }: { query: string; entry: Entry }) {
   const found = entry.result?.results;
+  const top = found ? pickTopResult(query, found, entry.playlists) : null;
+  const albumTracks = useTopAlbumTracks(top);
+  const songs = found ? songsFollowing(top, found.tracks, albumTracks) : [];
   return (
     <>
       <div className="search-top">
-        <TopResultCard query={query} entry={entry} />
-        {found && found.tracks.length > 0 && (
+        <TopResultCard top={top} />
+        {songs.length > 0 && (
           <section className="search-songs">
             <header className="shelf-head">
               <h2>
@@ -290,7 +301,7 @@ function AllResults({ query, entry }: { query: string; entry: Entry }) {
                 See all
               </a>
             </header>
-            <SongList tracks={found.tracks.slice(0, 5)} />
+            <SongList tracks={songs.slice(0, 5)} />
           </section>
         )}
       </div>
