@@ -24,6 +24,29 @@ const PRELOAD_BEFORE_END_S = 30;
 /** The server keeps at most this many queued tracks. */
 export const MAX_QUEUE = 1000;
 
+/** Volume is kept per device; the account's last volume only seeds a new device. */
+const VOLUME_KEY = "freeband.volume";
+
+function deviceVolume(): { volume: number; muted: boolean } | null {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(VOLUME_KEY) ?? "null") as { volume?: unknown; muted?: unknown } | null;
+    if (saved && typeof saved.volume === "number" && typeof saved.muted === "boolean") {
+      return { volume: Math.min(Math.max(saved.volume, 0), 1), muted: saved.muted };
+    }
+  } catch {
+    // Storage unavailable or unreadable: use the account's volume.
+  }
+  return null;
+}
+
+function saveDeviceVolume(volume: number, muted: boolean): void {
+  try {
+    window.localStorage.setItem(VOLUME_KEY, JSON.stringify({ volume, muted }));
+  } catch {
+    // Storage unavailable: the volume lasts until the page is reloaded.
+  }
+}
+
 export type Repeat = q.Repeat;
 
 export interface QueueItem {
@@ -380,11 +403,13 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
       player.setVolume(volume);
       player.setMuted(false);
       set({ volume, muted: false });
+      saveDeviceVolume(volume, false);
     },
     toggleMute() {
       const muted = !get().muted;
       player.setMuted(muted);
       set({ muted });
+      saveDeviceVolume(get().volume, muted);
     },
     setShuffle(shuffle) {
       const queue = get().queue;
@@ -399,6 +424,12 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     async load() {
       const { playback } = await me.playback();
       halt();
+      const device = deviceVolume();
+      if (device && !playback) {
+        player.setVolume(device.volume);
+        player.setMuted(device.muted);
+        set(device);
+      }
       if (playback) {
         const context = playback.context ?? QUEUE_CONTEXT;
         const items = playback.queue.map((track) => toItem(track, context));
@@ -410,14 +441,15 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
         if (playback.shuffle && order?.length === items.length) queue.order = order;
         const item = q.currentItem(queue);
         resumeAt = item ? playback.positionMs / 1000 : 0;
-        player.setVolume(playback.volume);
-        player.setMuted(playback.muted);
+        const { volume, muted } = deviceVolume() ?? playback;
+        player.setVolume(volume);
+        player.setMuted(muted);
         set({
           queue,
           shuffle: queue.order !== undefined,
           repeat: playback.repeat,
-          volume: playback.volume,
-          muted: playback.muted,
+          volume,
+          muted,
           player: { status: "idle", position: resumeAt, duration: (item?.track.durationMs ?? 0) / 1000 },
         });
         if (item) showMedia(item);
