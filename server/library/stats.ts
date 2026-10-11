@@ -49,7 +49,8 @@ export async function listeningStats(
     for (const r of rows) if (!snapshots.has(r.track_id)) snapshots.set(r.track_id, fromJson(r.snapshot_json));
   }
 
-  const artists = await plays()
+  const playArtists = db.selectFrom("play_artists").where("user_id", "=", userId);
+  const artists = await (since ? playArtists.where("played_at", ">=", since) : playArtists)
     .select((eb) => [
       "artist_id",
       eb.fn.max("artist_name").as("name"),

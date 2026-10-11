@@ -3,7 +3,7 @@ import { createDb } from "../db/index";
 import { migrateToLatest } from "../db/migrate";
 import { listeningStats } from "./stats";
 
-test("stats count plays, minutes, top tracks and main artists within the range", async () => {
+test("stats count plays, minutes, top tracks and every artist within the range", async () => {
   const db = createDb("sqlite::memory:");
   await migrateToLatest(db);
   await db
@@ -35,12 +35,26 @@ test("stats count plays, minutes, top tracks and main artists within the range",
       play(5, "t1", "a", "2026-01-01T00:00:00.000Z"),
     ])
     .execute();
+  await db
+    .insertInto("play_artists")
+    .values([
+      ...[1, 4, 5].map((n) => ({ n, artist: "a" })),
+      ...[2, 3].map((n) => ({ n, artist: "b" })),
+      { n: 3, artist: "c" },
+    ].map(({ n, artist }) => ({
+      play_id: `p${n}`,
+      user_id: "u",
+      artist_id: artist,
+      artist_name: artist.toUpperCase(),
+      played_at: ["", "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-01-01"][n] + "T00:00:00.000Z",
+    })))
+    .execute();
   const now = new Date("2026-10-10T00:00:00.000Z");
 
   const recent = await listeningStats(db, "u", "4w", now);
   expect(recent).toMatchObject({ totalPlays: 4, totalMinutes: 6 });
   expect(recent.topTracks.map((t) => [t.track.id, t.plays])).toEqual([["t2", 2], ["t3", 1], ["t1", 1]]);
-  expect(recent.topArtists.map((a) => [a.artist.name, a.plays])).toEqual([["A", 2], ["B", 2]]);
+  expect(recent.topArtists.map((a) => [a.artist.name, a.plays])).toEqual([["A", 2], ["B", 2], ["C", 1]]);
 
   const all = await listeningStats(db, "u", "all", now);
   expect(all.topTracks.map((t) => [t.track.id, t.plays])).toEqual([["t2", 2], ["t1", 2], ["t3", 1]]);

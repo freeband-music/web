@@ -39,24 +39,40 @@ export default async function historyRoutes(app: FastifyInstance): Promise<void>
     if (playedAt.getTime() > now().getTime() + CLOCK_SKEW_MS) throw badRequest("playedAt is in the future");
     const context = body.context ?? { type: "queue" as const };
     const main = body.track.artists[0];
-    await db
-      .insertInto("plays")
-      .values({
-        id: randomUUID(),
-        user_id: user.id,
-        track_id: body.track.id,
-        artist_id: main.id,
-        artist_name: main.name,
-        album_id: body.track.album?.id ?? null,
-        snapshot_json: JSON.stringify(body.track),
-        played_at: playedAt.toISOString(),
-        ms_played: body.msPlayed,
-        context_type: context.type,
-        context_id: context.id ?? null,
-        context_name: context.name ?? null,
-        context_image: context.image ?? null,
-      })
-      .execute();
+    const id = randomUUID();
+    const artists = [...new Map(body.track.artists.map((a) => [a.id, a])).values()];
+    await db.transaction().execute(async (tx) => {
+      await tx
+        .insertInto("plays")
+        .values({
+          id,
+          user_id: user.id,
+          track_id: body.track.id,
+          artist_id: main.id,
+          artist_name: main.name,
+          album_id: body.track.album?.id ?? null,
+          snapshot_json: JSON.stringify(body.track),
+          played_at: playedAt.toISOString(),
+          ms_played: body.msPlayed,
+          context_type: context.type,
+          context_id: context.id ?? null,
+          context_name: context.name ?? null,
+          context_image: context.image ?? null,
+        })
+        .execute();
+      await tx
+        .insertInto("play_artists")
+        .values(
+          artists.map((a) => ({
+            play_id: id,
+            user_id: user.id,
+            artist_id: a.id,
+            artist_name: a.name,
+            played_at: playedAt.toISOString(),
+          })),
+        )
+        .execute();
+    });
     return reply.status(204).send();
   });
 

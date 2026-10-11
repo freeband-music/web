@@ -124,7 +124,7 @@ export interface PlaysTable {
   id: string;
   user_id: string;
   track_id: string;
-  /** The track's main (first) artist; top artists count it only. */
+  /** The track's main (first) artist; every artist is in `play_artists`. */
   artist_id: string;
   artist_name: string;
   album_id: string | null;
@@ -135,6 +135,15 @@ export interface PlaysTable {
   context_id: string | null;
   context_name: string | null;
   context_image: string | null;
+}
+
+/** One row per artist of a play; top artists count them all. */
+export interface PlayArtistsTable {
+  play_id: string;
+  user_id: string;
+  artist_id: string;
+  artist_name: string;
+  played_at: string;
 }
 
 export interface RecentSearchesTable {
@@ -195,6 +204,7 @@ export interface Database {
   user_settings: UserSettingsTable;
   playback_state: PlaybackStateTable;
   play_links: PlayLinksTable;
+  play_artists: PlayArtistsTable;
 }
 
 export type User = Selectable<UsersTable>;
