@@ -2410,3 +2410,60 @@ textarea:focus {
     max-width: none;
   }
 }
+
+/* Queue status marks: shape and colour, details in the tooltip. */
+.qdot {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border: 2px solid var(--muted);
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  vertical-align: middle;
+}
+.qdot.ready {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.qdot.checking {
+  border-color: var(--muted);
+  border-top-color: transparent;
+  animation: spin 0.9s linear infinite;
+}
+.qdot.unavailable {
+  border-radius: 1px;
+  border-color: var(--muted);
+  background: var(--muted);
+}
+.qdot.error {
+  border-radius: 1px;
+  border-color: var(--danger);
+  background: var(--danger);
+  transform: rotate(45deg);
+  cursor: pointer;
+}
+.qdot.expired {
+  border-color: var(--warn);
+}
+.queue-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 12px;
+}
+.next-status {
+  position: relative;
+}
+.next-status .qdot {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  width: 7px;
+  height: 7px;
+  margin: 0;
+  pointer-events: none;
+}

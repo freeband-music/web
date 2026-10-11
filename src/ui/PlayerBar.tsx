@@ -1,6 +1,8 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { currentItem, nextIndex } from "../queue/queue";
 import { usePlayback } from "../store/playback";
+import { useQueueStatus } from "../store/queueStatus";
+import { QueueStatusDot } from "./QueueStatusDot";
 import { ArtistLinks, Cover, formatTime, IconButton, LikeButton, NowStatus, useLikeLookup } from "./common";
 import { links, navigate, useRoute } from "./router";
 
@@ -45,6 +47,26 @@ export function SeekBar() {
   );
 }
 
+const NEXT_STATUS_MS = 15_000;
+
+/** The status of the track that plays next, checked when it changes and every 15 s. */
+function useNextStatus() {
+  const nextId = usePlayback((s) => {
+    const index = nextIndex(s.queue, s.repeat, true);
+    return index === null || index === s.queue.current ? null : s.queue.items[index].track.id;
+  });
+  useEffect(() => {
+    if (!nextId) return;
+    const { load } = useQueueStatus.getState();
+    void load([nextId]);
+    const timer = setInterval(() => {
+      if (!document.hidden) void load([nextId]);
+    }, NEXT_STATUS_MS);
+    return () => clearInterval(timer);
+  }, [nextId]);
+  return useQueueStatus((s) => (nextId ? s.statuses[nextId] : undefined));
+}
+
 /** Shuffle, previous, play/pause, next and repeat (off → all → one). */
 export function TransportControls({ large }: { large?: boolean }) {
   const hasTrack = usePlayback((s) => currentItem(s.queue) !== undefined);
@@ -53,6 +75,7 @@ export function TransportControls({ large }: { large?: boolean }) {
   const repeat = usePlayback((s) => s.repeat);
   const hasNext = usePlayback((s) => nextIndex(s.queue, s.repeat) !== null);
   const { toggle, next, previous, setShuffle, cycleRepeat } = usePlayback.getState();
+  const nextStatus = useNextStatus();
   const size = large ? "large" : undefined;
   return (
     <div className={large ? "transport large" : "transport"}>
@@ -65,7 +88,10 @@ export function TransportControls({ large }: { large?: boolean }) {
       />
       <IconButton icon="previous" label="Previous" onClick={previous} disabled={!hasTrack} className={size} />
       <IconButton icon={busy ? "pause" : "play"} label={busy ? "Pause" : "Play"} onClick={toggle} disabled={!hasTrack} primary />
-      <IconButton icon="next" label="Next" onClick={next} disabled={!hasNext} className={size} />
+      <span className="next-status">
+        <IconButton icon="next" label="Next" onClick={next} disabled={!hasNext} className={size} />
+        {nextStatus && <QueueStatusDot status={nextStatus} />}
+      </span>
       <IconButton
         icon="repeat"
         label={repeat === "off" ? "Repeat all" : repeat === "all" ? "Repeat one" : "Turn repeat off"}

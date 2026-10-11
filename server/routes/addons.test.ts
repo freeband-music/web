@@ -115,6 +115,15 @@ test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch th
   expect(allStreamRequests.length).toBeGreaterThan(0);
   expect(allStreamRequests.every((u) => u.includes("queue=false"))).toBe(true);
 
+  const status = await app.inject({
+    method: "POST",
+    url: "/api/queue/status",
+    payload: { trackIds: ["fake:track:1", "fake:track:3", "fake:track:9"] },
+    headers: { cookie, "x-requested-with": "freeband" },
+  });
+  expect(status.json().statuses.map((s: { state: string }) => s.state)).toEqual(["ready", "unavailable", "unchecked"]);
+  expect(status.json().statuses[0].expiresAt).toBeTruthy();
+
   const list = (await call("GET", "/api/addons")).json();
   expect(JSON.stringify(list)).not.toContain("url_encrypted");
 

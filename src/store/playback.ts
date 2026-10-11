@@ -545,6 +545,12 @@ const sync = (() => {
 
   return {
     saveSoon,
+    /** Prefetches the queue again even if it has not changed (to re-check expired tracks). */
+    prefetchAgain() {
+      if (!active) return;
+      prefetched = "";
+      prefetch();
+    },
     start(fetchAhead: boolean) {
       active = true;
       queueDirty = false;
@@ -563,3 +569,8 @@ const sync = (() => {
     },
   };
 })();
+
+/** Asks the server to look ahead in the queue again, for tracks whose answers expired. */
+export function prefetchAgain(): void {
+  sync.prefetchAgain();
+}

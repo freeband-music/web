@@ -205,7 +205,7 @@ export type StreamResult =
   /** `allowQueue: false` and nothing cached yet. */
   | { kind: "not_cached" }
   | { kind: "no_addon" }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; addonName?: string };
 
 export interface StreamResolveResponse {
   result: StreamResult;
@@ -233,6 +233,32 @@ export interface PrefetchMetaRequest {
 export interface PrefetchResponse {
   /** Lookups started (cached items are skipped). */
   planned: number;
+}
+
+/**
+ * Where a queued track stands: `unchecked` (not looked up yet), `checking`,
+ * `ready` (cached, until `expiresAt`), `unavailable` (nothing playable right
+ * now), `error` (the last lookup failed) or `expired` (was ready; re-checked).
+ */
+export type QueueTrackState = "unchecked" | "checking" | "ready" | "unavailable" | "error" | "expired";
+
+export interface QueueTrackStatus {
+  state: QueueTrackState;
+  expiresAt?: string;
+  /** Quality of the first stream, when ready. */
+  quality?: Stream["quality"];
+  message?: string;
+  /** The stream add-on that failed, for `error`. */
+  addonName?: string;
+}
+
+/** `POST queue/status`: the status of each track, in the order asked. */
+export interface QueueStatusRequest {
+  trackIds: string[];
+}
+
+export interface QueueStatusResponse {
+  statuses: QueueTrackStatus[];
 }
 
 // Library. Tracks, albums and artists are stored as snapshots: enough to

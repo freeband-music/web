@@ -1,4 +1,4 @@
-import type { TrackSummary } from "../../shared/api";
+import type { QueueTrackStatus, TrackSummary } from "../../shared/api";
 import type { PrefetchConfig } from "../config";
 import type { ActiveAddon, AddonService } from "./service";
 
@@ -49,12 +49,22 @@ async function pool<T>(items: T[], concurrency: number, signal: AbortSignal, wor
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
 }
 
+/** Where the current stream prefetch is with one track. */
+type Progress = { state: "pending" | "checking" } | { state: "error"; message: string; addonName?: string };
+
+/** Most tracks whose last "ready" expiry is remembered per user. */
+const MAX_REMEMBERED = 2000;
+
 /**
  * One background prefetch job per user and kind; starting a new one cancels
  * the previous. Results land in the cache, so later requests are instant.
  */
 export class PrefetchManager {
   private readonly jobs = new Map<string, AbortController>();
+  /** Per user: the current stream prefetch's progress by track ID. */
+  private readonly progress = new Map<string, Map<string, Progress>>();
+  /** Per user: when each track last seen ready stops being ready, to tell "expired" from "unchecked". */
+  private readonly readyUntil = new Map<string, Map<string, string>>();
 
   constructor(
     private readonly service: AddonService,
@@ -94,13 +104,46 @@ export class PrefetchManager {
       limit: this.config.limit,
       queueAhead: allowDownloads ? this.config.queueAhead : 0,
     });
+    const progress = new Map<string, Progress>(steps.map((step) => [window[step.index].id, { state: "pending" }]));
+    this.progress.set(userId, progress);
     const run = pool(steps, this.config.concurrency, controller.signal, async (step) => {
       const track = window[step.index];
-      if (step.allowQueue) return this.service.streams(addons, track, true);
-      return this.service.streams(addons, await this.service.trackDetails(addons, track), false);
+      progress.set(track.id, { state: "checking" });
+      try {
+        const { result } = step.allowQueue
+          ? await this.service.streams(addons, track, true)
+          : await this.service.streams(addons, await this.service.trackDetails(addons, track), false);
+        if (result.kind === "error") progress.set(track.id, { state: "error", message: result.message, addonName: result.addonName });
+        else progress.delete(track.id);
+      } catch (err) {
+        progress.set(track.id, { state: "error", message: err instanceof Error ? err.message : "The lookup failed." });
+      }
     });
     this.finish(jobKey, controller, run);
     return steps.length;
+  }
+
+  /** The status of each track for the queue screen, from the stream cache and the running prefetch. */
+  async status(userId: string, addons: ActiveAddon[], trackIds: string[], now: Date): Promise<QueueTrackStatus[]> {
+    const progress = this.progress.get(userId);
+    let readyUntil = this.readyUntil.get(userId);
+    if (!readyUntil || readyUntil.size > MAX_REMEMBERED) {
+      readyUntil = new Map();
+      this.readyUntil.set(userId, readyUntil);
+    }
+    const remembered = readyUntil;
+    return Promise.all(
+      trackIds.map(async (id): Promise<QueueTrackStatus> => {
+        const cached = await this.service.cachedStatus(addons, id);
+        if (cached?.state === "ready") remembered.set(id, cached.expiresAt);
+        if (cached) return cached;
+        const step = progress?.get(id);
+        if (step?.state === "checking") return { state: "checking" };
+        if (step?.state === "error") return { state: "error", message: step.message, addonName: step.addonName };
+        const until = remembered.get(id);
+        return { state: until !== undefined && until <= now.toISOString() ? "expired" : "unchecked" };
+      }),
+    );
   }
 
   /** Warms album and track metadata; same cap as the stream prefetch. */

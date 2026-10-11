@@ -29,6 +29,7 @@ import {
   type PlaylistSearchResponse,
   type PlaylistsResponse,
   type PrefetchMetaRequest,
+  type QueueStatusResponse,
   type PrefetchRequest,
   type PrefetchResponse,
   type ProfileResponse,
@@ -174,6 +175,7 @@ export const content = {
   stream: (body: StreamResolveRequest) => send<StreamResolveResponse>("POST", "/stream", body),
   prefetch: (body: PrefetchRequest) => send<PrefetchResponse>("POST", "/prefetch", body),
   prefetchMeta: (body: PrefetchMetaRequest) => send<PrefetchResponse>("POST", "/prefetch/meta", body),
+  queueStatus: (trackIds: string[]) => send<QueueStatusResponse>("POST", "/queue/status", { trackIds }),
 };
 
 export const playlists = {

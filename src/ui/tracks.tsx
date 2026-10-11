@@ -203,6 +203,8 @@ export interface TrackListRow {
   track: TrackSnapshot;
   /** Shown in the leading column instead of the position (a track number). */
   lead?: ReactNode;
+  /** Shown before the title (the queue's status marks). */
+  badge?: ReactNode;
 }
 
 export interface TrackListProps {
@@ -352,7 +354,10 @@ export function TrackList(props: TrackListProps) {
                   </span>
                 )}
                 <span className="trow-text">
-                  <span className="trow-title">{track.title}</span>
+                  <span className="trow-title">
+                    {row.badge}
+                    {track.title}
+                  </span>
                   <span className="trow-sub">
                     <ArtistLinks artists={track.artists} />
                   </span>

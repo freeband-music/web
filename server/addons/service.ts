@@ -5,6 +5,7 @@ import type {
   Manifest,
   SearchResponse,
   SearchType,
+  Stream,
   StreamResolveResponse,
   StreamResponse,
   StreamResult,
@@ -152,7 +153,7 @@ function failure(addon: ActiveAddon, reason: unknown): AddonFailure {
 
 /** Combines per-add-on stream answers (in add-on order) into one result. */
 export function combineStreams(
-  answers: ({ response: StreamResponse } | { notCached: true } | { error: string })[],
+  answers: ({ response: StreamResponse } | { notCached: true } | { error: string; addonName?: string })[],
 ): StreamResult {
   const responses = answers.flatMap((a) => ("response" in a ? [a.response] : []));
   const streams = responses.filter((r) => r.status === "ok").flatMap((r) => r.streams);
@@ -160,8 +161,8 @@ export function combineStreams(
   const queued = responses.find((r) => r.status === "queued");
   if (queued) return { kind: "queued", message: queued.message };
   if (answers.some((a) => "notCached" in a)) return { kind: "not_cached" };
-  const error = answers.find((a): a is { error: string } => "error" in a);
-  if (responses.length === 0 && error) return { kind: "error", message: error.error };
+  const error = answers.find((a): a is { error: string; addonName?: string } => "error" in a);
+  if (responses.length === 0 && error) return { kind: "error", message: error.error, addonName: error.addonName };
   return { kind: "not_found" };
 }
 
@@ -301,6 +302,23 @@ export class AddonService {
     return entries.every((e) => e !== undefined && this.usable(e.value, true));
   }
 
+  /**
+   * What the stream cache says about a track: ready (some add-on has streams),
+   * unavailable (every add-on answered with nothing), or nothing known yet.
+   */
+  async cachedStatus(
+    addons: ActiveAddon[],
+    trackId: string,
+  ): Promise<{ state: "ready"; expiresAt: string; quality?: Stream["quality"] } | { state: "unavailable"; message?: string } | null> {
+    const asked = addons.filter((a) => serves(a, "stream", trackId));
+    if (asked.length === 0) return { state: "unavailable", message: "No stream add-on plays this track." };
+    const entries = await Promise.all(asked.map((a) => this.cache.get<StreamEntry>(this.streamKey(a, trackId))));
+    const ready = entries.find((e) => e?.value.response.status === "ok");
+    if (ready) return { state: "ready", expiresAt: ready.expiresAt, quality: ready.value.response.streams[0]?.quality };
+    if (entries.every((e) => e !== undefined)) return { state: "unavailable", message: entries[0]?.value.response.message };
+    return null;
+  }
+
   /** True when some add-on serving this track can be asked for its streams without queueing a download. */
   canCheckWithoutQueue(addons: ActiveAddon[], trackId: string): boolean {
     return addons.some((a) => serves(a, "stream", trackId) && supportsNoQueue(a.manifest));
@@ -335,7 +353,7 @@ export class AddonService {
           const response = await this.cache.dedupe(flightKey, () => this.fetchStreams(addon, key, details!, allowQueue));
           return { response: await linked(addon, response, link) };
         } catch (err) {
-          return { error: message(err) };
+          return { error: message(err), addonName: addon.manifest.name };
         }
       }),
     );

@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
-import type { AddonSearchResponse, PrefetchResponse, StreamResolveResponse, TrackSummary } from "../../shared/api";
+import type { AddonSearchResponse, PrefetchResponse, QueueStatusResponse, StreamResolveResponse, TrackSummary } from "../../shared/api";
 import { trackSummarySchema } from "../addons/schemas";
 import { withoutDownloads, type ActiveAddon } from "../addons/service";
 import { loadActiveAddons } from "../addons/store";
@@ -9,6 +9,8 @@ import { parse } from "../http";
 import { userDownloadsPermitted } from "../settings";
 
 const MAX_QUEUE = 1000;
+/** Only the start of the queue is prefetched, so only its status is worth asking for. */
+const MAX_STATUS = 200;
 
 const searchQuery = z.object({
   q: z.string().trim().min(1).max(200),
@@ -20,6 +22,7 @@ const prefetchBody = z.object({
   tracks: z.array(trackSummarySchema).max(MAX_QUEUE),
   current: z.number().int().min(-1).optional(),
 });
+const statusBody = z.object({ trackIds: z.array(z.string().min(1).max(512)).max(MAX_STATUS) });
 const prefetchMetaBody = z.object({
   albumIds: z.array(z.string().min(1).max(512)).max(MAX_QUEUE).optional(),
   trackIds: z.array(z.string().min(1).max(512)).max(MAX_QUEUE).optional(),
@@ -61,6 +64,11 @@ export default async function proxyRoutes(app: FastifyInstance): Promise<void> {
     const userId = currentUser(req).id;
     const planned = await prefetch.streams(userId, await active(req), upcoming, await userDownloadsPermitted(app.ctx, userId));
     return reply.status(202).send({ planned } satisfies PrefetchResponse);
+  });
+
+  app.post("/queue/status", async (req): Promise<QueueStatusResponse> => {
+    const body = parse(statusBody, req.body);
+    return { statuses: await prefetch.status(currentUser(req).id, await active(req), body.trackIds, now()) };
   });
 
   app.post("/prefetch/meta", async (req, reply) => {
