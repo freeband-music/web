@@ -30,8 +30,9 @@ function popularity(c: Candidate): number | undefined {
   return typeof value === "number" ? value : undefined;
 }
 
+/** The most popular candidate; null unless every candidate has a popularity (an add-on may not give one). */
 function mostPopular(candidates: Candidate[]): Candidate | null {
-  if (!candidates.some((c) => popularity(c) !== undefined)) return null;
+  if (candidates.length === 0 || candidates.some((c) => popularity(c) === undefined)) return null;
   return candidates.reduce((best, c) => {
     const diff = (popularity(c) ?? -1) - (popularity(best) ?? -1);
     return diff > 0 || (diff === 0 && KIND_RANK[c.kind] < KIND_RANK[best.kind]) ? c : best;
@@ -41,8 +42,9 @@ function mostPopular(candidates: Candidate[]): Candidate | null {
 /**
  * The search's "Top result": among artists, albums and songs named like the
  * query, the most popular; with no such match, the most popular of the first
- * result of each kind. Without popularity: an artist named like the query,
- * else the first song, album, artist or playlist.
+ * result of each kind. Popularity decides only when every candidate has one;
+ * otherwise: an artist named like the query, else the first song, album,
+ * artist or playlist.
  */
 export function pickTopResult(query: string, results: SearchResponse, playlists: PlaylistSummary[] = []): TopResult | null {
   const wanted = matchKey(query);

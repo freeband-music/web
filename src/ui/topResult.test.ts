@@ -48,3 +48,14 @@ describe("pickTopResult with popularity", () => {
     expect(songsFollowing(album, tracks, [by("s1", "a1"), tracks[0]]).map((t) => t.id)).toEqual(["s1", "t1", "t2", "t3"]);
   });
 });
+
+describe("pickTopResult with an add-on that gives no popularity", () => {
+  it("lets popularity decide only when every candidate has one", () => {
+    const mixed = {
+      artists: [{ id: "mb:a", name: "Dark Side of the Moon" }],
+      albums: [{ id: "dz:al", title: "The Dark Side of the Moon", artists: [], popularity: 75 }],
+      tracks: [],
+    };
+    expect(pickTopResult("dark side of the moon", mixed)).toMatchObject({ kind: "artist", artist: { id: "mb:a" } });
+  });
+});

@@ -106,8 +106,9 @@ export function idSegment(id: string): string {
 
 /**
  * Merges the lists of several add-ons, dropping repeated IDs. Each add-on's
- * order is kept; at each step the more popular of the add-ons' next items goes
- * first (no popularity counts as least; on a tie the earlier add-on wins).
+ * order is kept. When every add-on's next item has a popularity, the most
+ * popular goes first (on a tie the earlier add-on); otherwise the add-ons take
+ * turns, so one without popularity is not pushed to the end.
  */
 export function mergeById<T extends { id: string; popularity?: number }>(lists: unknown[]): T[] {
   const queues = lists.filter(Array.isArray).map((list) =>
@@ -116,16 +117,24 @@ export function mergeById<T extends { id: string; popularity?: number }>(lists: 
   const heads = queues.map(() => 0);
   const seen = new Set<string>();
   const merged: T[] = [];
-  const score = (item: T) => (typeof item.popularity === "number" ? item.popularity : -1);
+  const scored = (item: T) => typeof item.popularity === "number";
+  let turn = 0;
   for (;;) {
-    let best = -1;
+    const open: number[] = [];
     for (let i = 0; i < queues.length; i++) {
       while (heads[i] < queues[i].length && seen.has(queues[i][heads[i]].id)) heads[i]++;
-      if (heads[i] >= queues[i].length) continue;
-      if (best < 0 || score(queues[i][heads[i]]) > score(queues[best][heads[best]])) best = i;
+      if (heads[i] < queues[i].length) open.push(i);
     }
-    if (best < 0) return merged;
-    const item = queues[best][heads[best]++];
+    if (open.length === 0) return merged;
+    const head = (i: number) => queues[i][heads[i]];
+    let pick: number;
+    if (open.every((i) => scored(head(i)))) {
+      pick = open.reduce((best, i) => (head(i).popularity! > head(best).popularity! ? i : best));
+    } else {
+      pick = open.find((i) => i >= turn) ?? open[0];
+      turn = pick + 1;
+    }
+    const item = queues[pick][heads[pick]++];
     seen.add(item.id);
     merged.push(item);
   }
