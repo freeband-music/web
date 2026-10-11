@@ -5,7 +5,7 @@ import type { PlaylistResponse, PlaylistsResponse } from "../../shared/api";
 import { loadActiveAddons } from "../addons/store";
 import { currentUser, requireUser } from "../auth/guard";
 import type { User } from "../db/schema";
-import { badRequest, forbidden, notFound, parse } from "../http";
+import { badRequest, conflict, forbidden, notFound, parse } from "../http";
 import { changedPositions, insertAt, moveEntries } from "../library/order";
 import {
   canView,
@@ -35,7 +35,11 @@ const createBody = z.object({
   tracks: z.array(trackSnapshotSchema).max(MAX_ADD).optional(),
 });
 const updateBody = z.object({ name: name.optional(), description: description.optional(), visibility: visibility.optional() });
-const addBody = z.object({ tracks: z.array(trackSnapshotSchema).min(1).max(MAX_ADD), position: z.number().int().min(0).optional() });
+const addBody = z.object({
+  tracks: z.array(trackSnapshotSchema).min(1).max(MAX_ADD),
+  position: z.number().int().min(0).optional(),
+  duplicates: z.enum(["add", "skip", "ask"]).optional(),
+});
 const removeBody = z.object({ entryIds });
 const moveBody = z.object({ entryIds, beforeEntryId: z.string().min(1).max(64).nullable() });
 
@@ -166,10 +170,28 @@ export default async function playlistRoutes(app: FastifyInstance): Promise<void
     const timestamp = now().toISOString();
     await db.transaction().execute(async (trx) => {
       const previous = await currentOrder(trx, row.id);
-      if (previous.length + body.tracks.length > MAX_PLAYLIST_TRACKS) {
+      let tracks = body.tracks;
+      if (body.duplicates === "skip" || body.duplicates === "ask") {
+        const present = await trx
+          .selectFrom("playlist_tracks")
+          .select("track_id")
+          .where("playlist_id", "=", row.id)
+          .where("track_id", "in", [...new Set(tracks.map((t) => t.id))])
+          .execute();
+        const ids = new Set(present.map((p) => p.track_id));
+        const repeated = tracks.filter((t) => ids.has(t.id)).length;
+        if (repeated > 0 && body.duplicates === "ask") {
+          const message =
+            tracks.length === 1 ? "This song is already in the playlist." : `${repeated} of these ${tracks.length} songs ${repeated === 1 ? "is" : "are"} already in the playlist.`;
+          throw conflict(message, "duplicate_tracks");
+        }
+        tracks = tracks.filter((t) => !ids.has(t.id));
+      }
+      if (tracks.length === 0) return;
+      if (previous.length + tracks.length > MAX_PLAYLIST_TRACKS) {
         throw badRequest(`A playlist holds at most ${MAX_PLAYLIST_TRACKS} tracks`, "playlist_full");
       }
-      const added = body.tracks.map((t) => ({ id: randomUUID(), track: t }));
+      const added = tracks.map((t) => ({ id: randomUUID(), track: t }));
       const next = insertAt(previous, added.map((a) => a.id), body.position);
       await writeOrder(trx, previous, next);
       const index = new Map(next.map((id, i) => [id, i]));

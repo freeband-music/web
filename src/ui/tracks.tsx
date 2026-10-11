@@ -2,13 +2,13 @@
 
 import { useRef, useState, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import type { PlayContext, TrackSnapshot } from "../../shared/api";
-import { errorMessage } from "../api/client";
+import { ApiError, errorMessage } from "../api/client";
 import { currentItem } from "../queue/queue";
 import { useLibrary } from "../store/library";
 import { usePlayback } from "../store/playback";
 import { ArtistLinks, Cover, formatTime, IconButton, LikeButton, Mosaic, NowStatus, Spinner, useLikeLookup } from "./common";
 import { Icon } from "./icons";
-import { openMenu, promptDialog, toast, useIsPhone, type MenuAnchor, type MenuContext, type MenuItem, type MenuPage } from "./overlays";
+import { choiceDialog, confirmDialog, openMenu, promptDialog, toast, useIsPhone, type MenuAnchor, type MenuContext, type MenuItem, type MenuPage } from "./overlays";
 import { links } from "./router";
 import { nextSelection, type SelectMode } from "./selection";
 
@@ -28,8 +28,23 @@ function AddToPlaylist({ tracks, context }: { tracks: TrackSnapshot[]; context: 
 
   async function addTo(id: string, name: string) {
     context.close();
+    const add = (duplicates: "add" | "skip" | "ask") => useLibrary.getState().addToPlaylist(id, tracks, undefined, duplicates);
     try {
-      await useLibrary.getState().addToPlaylist(id, tracks);
+      try {
+        await add("ask");
+      } catch (error) {
+        if (!(error instanceof ApiError && error.code === "duplicate_tracks")) throw error;
+        const title = `Already in ${name}`;
+        const message = error.message;
+        if (tracks.length === 1) {
+          if (!(await confirmDialog({ title, message, confirmLabel: "Add anyway" }))) return;
+          await add("add");
+        } else {
+          const choice = await choiceDialog({ title, message, confirmLabel: "Add anyway", altLabel: "Add new ones only" });
+          if (choice === "cancel") return;
+          await add(choice === "confirm" ? "add" : "skip");
+        }
+      }
       toast(`Added to ${name}`);
     } catch (error) {
       toast(errorMessage(error));

@@ -74,6 +74,8 @@ interface DialogRequest {
   title: string;
   message?: ReactNode;
   confirmLabel: string;
+  /** A second action next to the confirm button; resolves with "alt". */
+  altLabel?: string;
   danger?: boolean;
   input?: { label: string; value?: string; placeholder?: string };
   resolve(value: string | boolean | null): void;
@@ -287,6 +289,11 @@ function DialogView() {
           <button type="button" className="button ghost" onClick={cancel}>
             Cancel
           </button>
+          {dialog.altLabel && (
+            <button type="button" className="button" onClick={() => finish("alt")}>
+              {dialog.altLabel}
+            </button>
+          )}
           <button
             className={dialog.danger ? "button danger" : "button primary"}
             disabled={dialog.input !== undefined && !value.trim()}
@@ -313,6 +320,17 @@ export async function confirmDialog(options: {
   danger?: boolean;
 }): Promise<boolean> {
   return (await ask({ confirmLabel: "OK", ...options })) === true;
+}
+
+/** Like `confirmDialog` with a second action: "confirm", "alt" or "cancel". */
+export async function choiceDialog(options: {
+  title: string;
+  message?: ReactNode;
+  confirmLabel: string;
+  altLabel: string;
+}): Promise<"confirm" | "alt" | "cancel"> {
+  const result = await ask(options);
+  return result === true ? "confirm" : result === "alt" ? "alt" : "cancel";
 }
 
 /** Asks for a line of text; null when cancelled. */

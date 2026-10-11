@@ -317,6 +317,11 @@ export interface AddPlaylistTracksRequest {
   tracks: TrackSnapshot[];
   /** 0-based index to insert at; default the end. */
   position?: number;
+  /**
+   * Tracks already in the playlist: `add` them again (default), `skip` them,
+   * or `ask`: add nothing and answer 409 `duplicate_tracks` if there are any.
+   */
+  duplicates?: "add" | "skip" | "ask";
 }
 
 /** `DELETE playlists/:id/tracks`. */

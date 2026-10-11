@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type {
+  AddPlaylistTracksRequest,
   AlbumSnapshot,
   ArtistSnapshot,
   CreatePlaylistRequest,
@@ -40,7 +41,12 @@ interface LibraryState {
   createPlaylist(request: CreatePlaylistRequest): Promise<PlaylistResponse>;
   updatePlaylist(id: string, patch: UpdatePlaylistRequest): Promise<PlaylistResponse>;
   deletePlaylist(id: string): Promise<void>;
-  addToPlaylist(id: string, tracks: TrackSnapshot[], position?: number): Promise<PlaylistResponse>;
+  addToPlaylist(
+    id: string,
+    tracks: TrackSnapshot[],
+    position?: number,
+    duplicates?: AddPlaylistTracksRequest["duplicates"],
+  ): Promise<PlaylistResponse>;
   removeFromPlaylist(id: string, entryIds: string[]): Promise<PlaylistResponse>;
   moveInPlaylist(id: string, entryIds: string[], beforeEntryId: string | null): Promise<PlaylistResponse>;
   setPlaylistFollowed(playlist: PlaylistSummary, followed: boolean): Promise<void>;
@@ -145,7 +151,8 @@ export const useLibrary = create<LibraryState>()((set, get) => {
       await playlistApi.remove(id);
       set({ playlists: get().playlists.filter((p) => p.id !== id) });
     },
-    addToPlaylist: async (id, tracks, position) => updated(await playlistApi.addTracks(id, { tracks, position })),
+    addToPlaylist: async (id, tracks, position, duplicates) =>
+      updated(await playlistApi.addTracks(id, { tracks, position, duplicates })),
     removeFromPlaylist: async (id, entryIds) => updated(await playlistApi.removeTracks(id, entryIds)),
     moveInPlaylist: async (id, entryIds, before) => updated(await playlistApi.moveTracks(id, entryIds, before)),
     async setPlaylistFollowed(playlist, followed) {
