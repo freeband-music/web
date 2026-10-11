@@ -16,6 +16,8 @@ import type { Album } from "../types";
 import { useSettings } from "./settings";
 
 const SKIP_DELAY_MS = 3000;
+/** Automatic skipping stops after this many unplayable tracks in a row. */
+export const MAX_SKIPS_IN_A_ROW = 3;
 const SAVE_DELAY_MS = 2000;
 const POSITION_SAVE_MS = 10_000;
 const PREFETCH_DELAY_MS = 500;
@@ -77,6 +79,11 @@ interface PlaybackState {
   muted: boolean;
   now: NowState;
   player: PlayerState;
+  /**
+   * Automatic skipping over an unplayable track: `pending` while waiting to
+   * skip (pause cancels it), `stopped` after too many in a row.
+   */
+  skip: "pending" | "stopped" | null;
 
   /** Replaces the queue with a list (an album, playlist or artist) and plays from `index`. */
   playList(tracks: TrackSnapshot[], index: number, context: PlayContext): void;
@@ -129,6 +136,8 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
   let streamIndex = 0;
   /** Items skipped in a row because they could not play; stops endless skipping. */
   let failedInARow = 0;
+  /** The next `startAt` comes from an automatic skip, not from the user. */
+  let autoSkip = false;
   /** Where to start the current item when it is first played (a restored queue). */
   let resumeAt = 0;
   /** Seconds of the current play-through actually listened to, and whether it was recorded. */
@@ -213,11 +222,23 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     set({ now });
     if (now.phase === "no_addon" || now.phase === "offline") return;
     failedInARow += 1;
-    if (failedInARow >= get().queue.items.length) return;
+    if (failedInARow >= Math.min(MAX_SKIPS_IN_A_ROW, get().queue.items.length)) {
+      set({ skip: "stopped" });
+      return;
+    }
     const mine = generation;
+    set({ skip: "pending" });
     skipTimer = setTimeout(() => {
-      if (mine === generation) advance(false);
+      if (mine !== generation) return;
+      autoSkip = true;
+      advance(false);
     }, SKIP_DELAY_MS);
+  }
+
+  /** Stays on the current unplayable track instead of skipping it. */
+  function cancelSkip() {
+    clearTimeout(skipTimer);
+    set({ skip: null });
   }
 
   /** Moves on after the current item; `auto` when it finished on its own. */
@@ -242,7 +263,7 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     player.stop();
     player.clearPreload();
     player.setMediaInfo(null);
-    set({ now: { phase: "idle" } });
+    set({ now: { phase: "idle" }, skip: null });
   }
 
   function showMedia(item: QueueItem) {
@@ -264,12 +285,15 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     }
     const mine = ++generation;
     clearTimeout(skipTimer);
+    // Anything the user starts gets a fresh run of automatic skips.
+    if (!autoSkip) failedInARow = 0;
+    autoSkip = false;
     streams = [];
     resumeAt = 0;
     resetPlayCount();
     lastPosition = from;
     player.stop();
-    set({ queue, now: { phase: "resolving" } });
+    set({ queue, now: { phase: "resolving" }, skip: null });
     showMedia(item);
 
     let response;
@@ -306,8 +330,9 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
 
   const actions = {
     toggle() {
-      const { player: state, queue } = get();
-      if (state.status === "playing" || state.status === "loading") player.pause();
+      const { player: state, queue, skip } = get();
+      if (skip === "pending") cancelSkip();
+      else if (state.status === "playing" || state.status === "loading") player.pause();
       else if (player.loaded) player.resume();
       else if (queue.current >= 0) void startAt(queue, resumeAt);
       else if (queue.items.length > 0) void startAt(q.jump(queue, 0));
@@ -340,6 +365,7 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     muted: false,
     now: { phase: "idle" },
     player: { status: "idle", position: 0, duration: 0 },
+    skip: null,
     ...actions,
 
     playList(tracks, index, context) {

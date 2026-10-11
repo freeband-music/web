@@ -70,7 +70,8 @@ function useNextStatus() {
 /** Shuffle, previous, play/pause, next and repeat (off → all → one). */
 export function TransportControls({ large }: { large?: boolean }) {
   const hasTrack = usePlayback((s) => currentItem(s.queue) !== undefined);
-  const busy = usePlayback((s) => s.player.status === "playing" || s.player.status === "loading");
+  // While waiting to skip an unplayable track, the button pauses (stays on it).
+  const busy = usePlayback((s) => s.player.status === "playing" || s.player.status === "loading" || s.skip === "pending");
   const shuffle = usePlayback((s) => s.shuffle);
   const repeat = usePlayback((s) => s.repeat);
   const hasNext = usePlayback((s) => nextIndex(s.queue, s.repeat) !== null);

@@ -1,7 +1,7 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { errorMessage } from "../api/client";
 import { useLibrary } from "../store/library";
-import type { NowState } from "../store/playback";
+import { MAX_SKIPS_IN_A_ROW, usePlayback, type NowState } from "../store/playback";
 import { trackSnapshot } from "../snapshots";
 import type { ArtistSummary, TrackSummary } from "../types";
 import { Icon, type IconName } from "./icons";
@@ -91,6 +91,22 @@ export function Spinner({ label }: { label?: string }) {
 
 /** The visible state of the current track while it is not simply playing. */
 export function NowStatus({ now }: { now: NowState }) {
+  const skip = usePlayback((s) => s.skip);
+  const reason = nowReason(now);
+  if (!reason || !skip) return reason;
+  return (
+    <>
+      {reason}
+      <span className="status">
+        {skip === "pending"
+          ? "Skipping to the next track… Press pause to stay."
+          : `${MAX_SKIPS_IN_A_ROW} tracks in a row aren't available. Press play to try again or Next to go on.`}
+      </span>
+    </>
+  );
+}
+
+function nowReason(now: NowState) {
   switch (now.phase) {
     case "resolving":
       return (
