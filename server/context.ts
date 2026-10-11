@@ -5,6 +5,7 @@ import type { AddonService } from "./addons/service";
 import type { RateLimiter } from "./auth/rate-limit";
 import type { Cache } from "./cache/cache";
 import type { Config } from "./config";
+import type { PlayLinks } from "./play/links";
 import type { Db } from "./db/index";
 
 /** Dependencies `buildApp` takes; tests pass an in-memory database and a fixed clock. */
@@ -29,6 +30,9 @@ export interface AppContext {
   /** Refuses add-on requests to private network addresses when the admin turns it on. */
   addonGuard: AddonNetworkGuard;
   prefetch: PrefetchManager;
+  playLinks: PlayLinks;
+  /** HTTP client for play requests; redirects are not followed and the network guard is applied by hand. */
+  mediaFetch: FetchFn;
 }
 
 declare module "fastify" {

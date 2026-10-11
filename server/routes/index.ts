@@ -7,6 +7,7 @@ import healthRoutes from "./health";
 import historyRoutes from "./history";
 import libraryRoutes from "./library";
 import meRoutes from "./me";
+import playRoutes from "./play";
 import playlistRoutes from "./playlists";
 import proxyRoutes from "./proxy";
 import userRoutes from "./users";
@@ -21,6 +22,7 @@ export const routeModules: RouteModule[] = [
   adminRoutes,
   addonRoutes,
   proxyRoutes,
+  playRoutes,
   playlistRoutes,
   libraryRoutes,
   historyRoutes,

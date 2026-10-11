@@ -7,6 +7,7 @@ import { CSRF_HEADER, CSRF_VALUE } from "../shared/api";
 import { defaultFetch } from "./addons/http";
 import { AddonNetworkGuard } from "./addons/network";
 import { PrefetchManager } from "./addons/prefetch";
+import { PlayLinks } from "./play/links";
 import { AddonService } from "./addons/service";
 import { RateLimiter } from "./auth/rate-limit";
 import { Cache, DbCacheStore } from "./cache/cache";
@@ -29,7 +30,8 @@ export async function buildApp(config: Config, deps: Deps, options: BuildOptions
   const cache = new Cache(new DbCacheStore(deps.db), now);
   const addonGuard = new AddonNetworkGuard(deps.lookup);
   addonGuard.blockPrivate = await getBlockPrivateAddons(deps.db);
-  const addons = new AddonService(cache, config.ttl, addonGuard.wrap(deps.fetch ?? defaultFetch));
+  const fetchFn = deps.fetch ?? defaultFetch;
+  const addons = new AddonService(cache, config.ttl, addonGuard.wrap(fetchFn));
   const ctx: AppContext = {
     config,
     db: deps.db,
@@ -39,11 +41,14 @@ export async function buildApp(config: Config, deps: Deps, options: BuildOptions
     addons,
     addonGuard,
     prefetch: new PrefetchManager(addons, config.prefetch),
+    playLinks: new PlayLinks(deps.db, config.secretKey, now),
+    mediaFetch: fetchFn,
   };
   app.decorate("ctx", ctx);
 
   const purge = setInterval(() => {
     cache.purge().catch((err) => app.log.error(err, "cache purge failed"));
+    ctx.playLinks.purge().catch((err) => app.log.error(err, "play link purge failed"));
   }, PURGE_INTERVAL_MS);
   purge.unref();
   app.addHook("onClose", async () => {

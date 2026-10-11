@@ -98,7 +98,19 @@ test.skipIf(!hasPython)("install the fake add-on, search, stream and prefetch th
   expect(first.result.kind).toBe("ok");
   expect(first.result.streams[0].match.kind).toBe("exact");
   expect(first.cached).toBe(false);
-  expect((await call("POST", "/api/stream", { track: track1 })).json().cached).toBe(true);
+  const again = (await call("POST", "/api/stream", { track: track1 })).json();
+  expect(again.cached).toBe(true);
+
+  // The browser gets the same play link every time, never the add-on's URL.
+  const link: string = first.result.streams[0].url;
+  expect(link).toMatch(/^\/api\/play\/[\w-]{40,}$/);
+  expect(again.result.streams[0].url).toBe(link);
+  expect((await app.inject({ method: "GET", url: link })).statusCode).toBe(401);
+  // The fake add-on's audio URL answers 404, so the play fails without showing it.
+  const play = await call("GET", link);
+  expect(play.statusCode).toBe(502);
+  expect(play.body).not.toContain(addonUrl.split("//")[1]);
+  expect(requested.some((u) => u.endsWith("/audio/1.mp3"))).toBe(true);
   const allStreamRequests = requested.filter((u) => u.includes("/stream/track/"));
   expect(allStreamRequests.length).toBeGreaterThan(0);
   expect(allStreamRequests.every((u) => u.includes("queue=false"))).toBe(true);

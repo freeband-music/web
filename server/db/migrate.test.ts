@@ -14,6 +14,7 @@ test("migrations run up to latest and back down to nothing", async () => {
     "followed_artists",
     "invites",
     "likes",
+    "play_links",
     "playback_state",
     "playlist_follows",
     "playlist_tracks",

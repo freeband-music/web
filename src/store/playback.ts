@@ -19,6 +19,8 @@ const SKIP_DELAY_MS = 3000;
 const SAVE_DELAY_MS = 2000;
 const POSITION_SAVE_MS = 10_000;
 const PREFETCH_DELAY_MS = 500;
+/** The next track starts loading this many seconds before the current one ends. */
+const PRELOAD_BEFORE_END_S = 30;
 /** The server keeps at most this many queued tracks. */
 export const MAX_QUEUE = 1000;
 
@@ -110,6 +112,8 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
   let played = 0;
   let lastPosition = 0;
   let recorded = false;
+  /** The generation whose next track has been preloaded (or is being). */
+  let preloadedFor = -1;
 
   const player = new Player({
     onState(state) {
@@ -118,6 +122,7 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
         const delta = state.position - lastPosition;
         if (delta > 0 && delta < 1.5) played += delta;
         if (!recorded && played * 1000 >= PLAY_THRESHOLD_MS) recordPlay();
+        if (state.duration > 0 && state.duration - state.position <= PRELOAD_BEFORE_END_S) preloadNext();
       }
       lastPosition = state.position;
       set({ player: state });
@@ -140,6 +145,28 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     if (!item) return;
     void history
       .recordPlay({ track: item.track, msPlayed: Math.round(played * 1000), context: item.context })
+      .catch(() => {});
+  }
+
+  /**
+   * Loads the track that will play after the current one ends, so the change is
+   * immediate. Asking for its stream here also lets the server fetch its media link.
+   */
+  function preloadNext() {
+    if (preloadedFor === generation) return;
+    preloadedFor = generation;
+    const mine = generation;
+    const { queue, repeat } = get();
+    const index = q.nextIndex(queue, repeat, true);
+    if (index === null || index === queue.current) return;
+    const item = queue.items[index];
+    content
+      .stream({ track: trackSummary(item.track) })
+      .then((response) => {
+        if (mine !== generation) return;
+        const result = toResolveResult(response.result, useSettings.getState().quality);
+        if (result.kind === "ok") player.preload(result.streams[0].url);
+      })
       .catch(() => {});
   }
 
@@ -190,6 +217,7 @@ export const usePlayback = create<PlaybackState>()((set, get) => {
     streams = [];
     resumeAt = 0;
     player.stop();
+    player.clearPreload();
     player.setMediaInfo(null);
     set({ now: { phase: "idle" } });
   }

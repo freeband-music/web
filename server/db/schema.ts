@@ -161,6 +161,22 @@ export interface PlaybackStateTable {
   updated_at: string;
 }
 
+/** A short-lived link to one stream of one user; the add-on's play URL never reaches the browser. */
+export interface PlayLinksTable {
+  /** SHA-256 (hex) of the token. */
+  token_hash: string;
+  /** SHA-256 (hex) of user, add-on and play URL; finds a link to reuse. */
+  stream_key: string;
+  user_id: string;
+  addon_id: string;
+  /** The token, encrypted with the server key, so the same link can be handed out again. */
+  token_encrypted: string;
+  /** The add-on's play URL, encrypted with the server key. */
+  url_encrypted: string;
+  expires_at: string;
+  created_at: string;
+}
+
 export interface Database {
   users: UsersTable;
   sessions: SessionsTable;
@@ -178,6 +194,7 @@ export interface Database {
   recent_searches: RecentSearchesTable;
   user_settings: UserSettingsTable;
   playback_state: PlaybackStateTable;
+  play_links: PlayLinksTable;
 }
 
 export type User = Selectable<UsersTable>;

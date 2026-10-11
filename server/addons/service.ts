@@ -152,6 +152,16 @@ export function combineStreams(
   return { kind: "not_found" };
 }
 
+/** Turns an add-on's stream URL into the link handed to the browser. */
+export type StreamLinker = (addon: ActiveAddon, url: string) => Promise<string>;
+
+/** A copy of a stream answer with every URL replaced by its link. */
+async function linked(addon: ActiveAddon, response: StreamResponse, link?: StreamLinker): Promise<StreamResponse> {
+  if (!link || response.streams.length === 0) return response;
+  const streams = await Promise.all(response.streams.map(async (s) => ({ ...s, url: await link(addon, s.url) })));
+  return { ...response, streams };
+}
+
 /** Add-on requests on behalf of users, through the cache. */
 export class AddonService {
   constructor(
@@ -288,7 +298,12 @@ export class AddonService {
    * that support it are sent `queue=false` (answer only what is playable now);
    * older add-ons are not contacted, as they may queue a download on any request.
    */
-  async streams(addons: ActiveAddon[], track: TrackSummary, allowQueue: boolean): Promise<StreamResolveResponse> {
+  async streams(
+    addons: ActiveAddon[],
+    track: TrackSummary,
+    allowQueue: boolean,
+    link?: StreamLinker,
+  ): Promise<StreamResolveResponse> {
     const asked = addons.filter((a) => serves(a, "stream", track.id));
     if (asked.length === 0) return { result: { kind: "no_addon" }, cached: false };
     let details: Promise<TrackSummary> | undefined;
@@ -297,7 +312,7 @@ export class AddonService {
       asked.map(async (addon) => {
         const key = this.streamKey(addon, track.id);
         const hit = await this.cache.get<StreamEntry>(key);
-        if (hit && this.usable(hit.value, allowQueue)) return { response: hit.value.response };
+        if (hit && this.usable(hit.value, allowQueue)) return { response: await linked(addon, hit.value.response, link) };
         if (!allowQueue && !supportsNoQueue(addon.manifest)) return { notCached: true as const };
         cached = false;
         details ??= this.trackDetails(addons, track);
@@ -305,7 +320,7 @@ export class AddonService {
         const flightKey = allowQueue ? key : `${key}:noqueue`;
         try {
           const response = await this.cache.dedupe(flightKey, () => this.fetchStreams(addon, key, details!, allowQueue));
-          return { response };
+          return { response: await linked(addon, response, link) };
         } catch (err) {
           return { error: message(err) };
         }

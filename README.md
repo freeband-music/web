@@ -141,6 +141,12 @@ types in `server/db/schema.ts`.
   with `FREEBAND_SECRET_KEY`. Keep the key safe and back it up: if it is lost
   or changed, stored add-ons can no longer be read and users must install
   them again.
+- Add-on URLs never reach the browser. Stream URLs are handed out as
+  `/api/play/<token>` links that work only for the signed-in user who got
+  them and last 6 hours. The server asks the add-on itself and redirects the
+  browser to the media URL the add-on points at, or relays the audio when the
+  add-on serves it directly. Add-ons therefore only need to be reachable
+  from the server, not from listening devices.
 - Serve Freeband over HTTPS. Behind a reverse proxy, set
   `FREEBAND_TRUST_PROXY=true` so client addresses (used for sign-in rate
   limiting) and HTTPS detection (used for secure cookies) are correct.

@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { AddonSearchResponse, PrefetchResponse, StreamResolveResponse, TrackSummary } from "../../shared/api";
 import { trackSummarySchema } from "../addons/schemas";
-import { withoutDownloads } from "../addons/service";
+import { withoutDownloads, type ActiveAddon } from "../addons/service";
 import { loadActiveAddons } from "../addons/store";
 import { currentUser, requireUser } from "../auth/guard";
 import { parse } from "../http";
@@ -46,8 +46,12 @@ export default async function proxyRoutes(app: FastifyInstance): Promise<void> {
   app.post("/stream", async (req): Promise<StreamResolveResponse> => {
     const body = parse(streamBody, req.body);
     // The request can only narrow what the server and the user allow.
-    const downloads = await userDownloadsPermitted(app.ctx, currentUser(req).id);
-    const response = await service.streams(await active(req), body.track as TrackSummary, downloads && (body.allowQueue ?? true));
+    const userId = currentUser(req).id;
+    const downloads = await userDownloadsPermitted(app.ctx, userId);
+    // The browser only ever gets play links; add-on URLs may carry the user's credentials.
+    const link = (addon: ActiveAddon, url: string) => app.ctx.playLinks.issue(userId, addon.id, url);
+    const allowQueue = downloads && (body.allowQueue ?? true);
+    const response = await service.streams(await active(req), body.track as TrackSummary, allowQueue, link);
     return downloads ? response : withoutDownloads(response);
   });
 
