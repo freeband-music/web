@@ -77,6 +77,9 @@ function NetworkSettings() {
   );
 }
 
+/** A link that opens sign-up with the code filled in. */
+const inviteLink = (code: string) => `${window.location.origin}/?invite=${encodeURIComponent(code)}`;
+
 function Invites({ names }: { names: Map<string, string> }) {
   const [version, setVersion] = useState(0);
   const invites = useAsync(() => admin.invites(), `invites-${version}`);
@@ -85,7 +88,7 @@ function Invites({ names }: { names: Map<string, string> }) {
     try {
       const { invite } = await admin.createInvite();
       refresh();
-      await copyText(invite.code, "Invite created and copied");
+      await copyText(inviteLink(invite.code), "Invite link created and copied");
     } catch (error) {
       toast(errorMessage(error));
     }
@@ -109,7 +112,7 @@ function Invites({ names }: { names: Map<string, string> }) {
           Create invite
         </button>
       </div>
-      <p className="muted small">Share a code with someone; it works once, when sign-up is set to invite only.</p>
+      <p className="muted small">Share an invite link (or its code) with someone; it works once, when sign-up is set to invite only.</p>
       {"error" in invites && <p className="status error">{invites.error}</p>}
       {!invites.loading && sorted.length === 0 && <p className="muted">No invites yet.</p>}
       <ul className="admin-list">
@@ -124,8 +127,8 @@ function Invites({ names }: { names: Map<string, string> }) {
               </span>
             </span>
             {!invite.usedAt && (
-              <button className="button small" onClick={() => void copyText(invite.code, "Invite code copied")}>
-                Copy
+              <button className="button small" onClick={() => void copyText(inviteLink(invite.code), "Invite link copied")}>
+                Copy link
               </button>
             )}
             <button className="button small ghost" onClick={() => void remove(invite)}>

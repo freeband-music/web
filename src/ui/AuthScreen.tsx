@@ -2,6 +2,17 @@ import { useEffect, useState, type FormEvent } from "react";
 import { errorMessage } from "../api/client";
 import { useAuth } from "../store/auth";
 
+/** The code from an invite link (`/?invite=CODE`), taken out of the address bar. */
+function inviteFromUrl(): string {
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get("invite") ?? "";
+  if (url.searchParams.has("invite")) {
+    url.searchParams.delete("invite");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }
+  return code;
+}
+
 export function AuthScreen() {
   const config = useAuth((s) => s.config);
   const serverDown = useAuth((s) => s.serverDown);
@@ -9,10 +20,10 @@ export function AuthScreen() {
   const firstRun = config?.hasUsers === false;
   const canSignUp = firstRun || (config !== null && config.signup !== "closed");
   const needsInvite = !firstRun && config?.signup === "invite";
-  const [mode, setMode] = useState<"login" | "signup">(firstRun ? "signup" : "login");
+  const [invite, setInvite] = useState(inviteFromUrl);
+  const [mode, setMode] = useState<"login" | "signup">(firstRun || invite ? "signup" : "login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [invite, setInvite] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const signingUp = mode === "signup" && canSignUp;
